@@ -5,6 +5,7 @@ mod engine;
 mod execution;
 mod market;
 mod monitor;
+mod notify;
 mod output;
 mod storage;
 mod types;

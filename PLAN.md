@@ -58,7 +58,7 @@ leader sources
 - [ ] On-chain websocket backup monitor.
 - [x] FIFO sell matching for paper positions and realized PnL.
 - [ ] Multi-account allocation.
-- [ ] Webhook/Telegram notifications.
+- [x] Webhook/Telegram notifications for copy intents.
 - [ ] Import leader scores from PolyAlpha.
 - [ ] Local HTTP API.
 

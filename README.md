@@ -113,3 +113,16 @@ Optional account signature type in `config.toml`:
 [account]
 signature_type = "proxy" # proxy, eoa, or gnosis-safe
 ```
+
+## Notifications
+
+Notifications are optional and best-effort. A failed notification logs a warning
+but does not stop the follow loop.
+
+```toml
+[notifications]
+webhook_url = "https://example.com/polyfollow"
+telegram_bot_token = "123456:bot-token"
+telegram_chat_id = "123456789"
+notify_blocked = false
+```

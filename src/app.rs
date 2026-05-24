@@ -14,6 +14,7 @@ use crate::engine::{RiskContext, build_intent};
 use crate::execution::{LiveExecutionConfig, execute_live_market_order};
 use crate::market::OrderBookClient;
 use crate::monitor::ActivityPoller;
+use crate::notify::Notifier;
 use crate::output::print_json;
 use crate::storage::Storage;
 use crate::validate::normalize_address;
@@ -383,6 +384,7 @@ async fn run_once(
 
     let poller = ActivityPoller::new(&cfg.global.data_api_base_url);
     let order_books = OrderBookClient::new(&cfg.global.clob_base_url);
+    let notifier = Notifier::new(&cfg.notifications);
     let mut stats = RunStats::default();
     for leader in cfg.leaders.iter().filter(|leader| leader.enabled) {
         let trades = poller
@@ -432,6 +434,7 @@ async fn run_once(
             if intent.verdict == crate::types::IntentVerdict::Paper {
                 let result = storage.apply_paper_intent(&intent)?;
                 stats.paper_fills += result.opened_fills + result.closed_lots;
+                notifier.notify_intent(&intent, Some(&result)).await;
             } else if intent.verdict == crate::types::IntentVerdict::Live {
                 let request = serde_json::to_value(&intent)?;
                 match execute_live_market_order(
@@ -447,6 +450,7 @@ async fn run_once(
                             &request,
                             Some(&response),
                         )?;
+                        notifier.notify_intent(&intent, None).await;
                     }
                     Err(error) => {
                         storage.insert_live_attempt(
@@ -460,6 +464,7 @@ async fn run_once(
                 }
             } else {
                 stats.blocked_intents += 1;
+                notifier.notify_intent(&intent, None).await;
             }
         }
     }

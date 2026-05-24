@@ -17,6 +17,8 @@ pub struct AppConfig {
     #[serde(default)]
     pub account: AccountConfig,
     #[serde(default)]
+    pub notifications: NotificationConfig,
+    #[serde(default)]
     pub leaders: Vec<LeaderConfig>,
 }
 
@@ -52,6 +54,18 @@ pub struct AccountConfig {
     pub max_daily_loss_usdc: Decimal,
     #[serde(default = "default_signature_type")]
     pub signature_type: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NotificationConfig {
+    #[serde(default)]
+    pub webhook_url: Option<String>,
+    #[serde(default)]
+    pub telegram_bot_token: Option<String>,
+    #[serde(default)]
+    pub telegram_chat_id: Option<String>,
+    #[serde(default)]
+    pub notify_blocked: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -129,6 +143,7 @@ impl Default for AppConfig {
         Self {
             global: GlobalConfig::default(),
             account: AccountConfig::default(),
+            notifications: NotificationConfig::default(),
             leaders: Vec::new(),
         }
     }
