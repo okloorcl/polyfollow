@@ -5,7 +5,9 @@ use rusqlite::{Connection, params};
 use rust_decimal::Decimal;
 use serde::Serialize;
 
-use crate::types::{CopyIntent, IntentVerdict, LeaderTrade, PaperFill};
+use crate::types::{
+    CopyIntent, IntentVerdict, LeaderTrade, PaperExecutionResult, PaperFill, TradeSide,
+};
 
 #[derive(Debug, Serialize)]
 pub struct StorageStatus {
@@ -260,6 +262,51 @@ impl Storage {
         Ok(())
     }
 
+    pub fn apply_paper_intent(&mut self, intent: &CopyIntent) -> Result<PaperExecutionResult> {
+        match intent.side {
+            TradeSide::Buy => {
+                let Some(fill) = crate::execution::paper_fill_for(intent) else {
+                    return Ok(PaperExecutionResult {
+                        opened_fills: 0,
+                        closed_lots: 0,
+                        realized_pnl_usdc: Decimal::ZERO,
+                    });
+                };
+                self.insert_paper_fill(&fill)?;
+                Ok(PaperExecutionResult {
+                    opened_fills: 1,
+                    closed_lots: 0,
+                    realized_pnl_usdc: Decimal::ZERO,
+                })
+            }
+            TradeSide::Sell => self.close_paper_fifo(intent),
+        }
+    }
+
+    pub fn leader_token_open_shares(
+        &self,
+        leader_address: &str,
+        token_id: Option<&str>,
+    ) -> Result<Decimal> {
+        let Some(token_id) = token_id else {
+            return Ok(Decimal::ZERO);
+        };
+        let value: Option<String> = self.conn.query_row(
+            r#"
+            SELECT CAST(COALESCE(SUM(CAST(p.shares AS REAL)), 0) AS TEXT)
+            FROM paper_fills p
+            JOIN copy_intents i ON i.intent_id = p.intent_id
+            WHERE i.leader_address = ?1
+              AND i.token_id = ?2
+              AND i.side = 'buy'
+              AND p.status = 'open'
+            "#,
+            params![leader_address, token_id],
+            |row| row.get(0),
+        )?;
+        Ok(parse_decimal_or_zero(value))
+    }
+
     pub fn insert_live_attempt(
         &self,
         intent_id: &str,
@@ -408,6 +455,152 @@ impl Storage {
         let sql = format!("SELECT COUNT(*) FROM {table}");
         Ok(self.conn.query_row(&sql, [], |row| row.get(0))?)
     }
+
+    fn close_paper_fifo(&mut self, intent: &CopyIntent) -> Result<PaperExecutionResult> {
+        if intent.verdict != IntentVerdict::Paper {
+            return Ok(PaperExecutionResult {
+                opened_fills: 0,
+                closed_lots: 0,
+                realized_pnl_usdc: Decimal::ZERO,
+            });
+        }
+        let token_id = intent
+            .token_id
+            .as_deref()
+            .ok_or_else(|| anyhow::anyhow!("paper sell requires token_id"))?;
+        let exit_price = intent
+            .target_price
+            .ok_or_else(|| anyhow::anyhow!("paper sell requires target_price"))?;
+        let mut remaining = intent
+            .shares
+            .ok_or_else(|| anyhow::anyhow!("paper sell requires shares"))?;
+        if remaining <= Decimal::ZERO {
+            return Ok(PaperExecutionResult {
+                opened_fills: 0,
+                closed_lots: 0,
+                realized_pnl_usdc: Decimal::ZERO,
+            });
+        }
+
+        let tx = self.conn.transaction()?;
+        let lots = {
+            let mut stmt = tx.prepare(
+                r#"
+                SELECT p.paper_fill_id, p.intent_id, p.entry_price, p.shares,
+                       p.notional_usdc, p.opened_at
+                FROM paper_fills p
+                JOIN copy_intents i ON i.intent_id = p.intent_id
+                WHERE i.leader_address = ?1
+                  AND i.token_id = ?2
+                  AND i.side = 'buy'
+                  AND p.status = 'open'
+                ORDER BY p.opened_at ASC, p.paper_fill_id ASC
+                "#,
+            )?;
+            let rows = stmt.query_map(params![intent.leader_address, token_id], |row| {
+                Ok(OpenPaperLot {
+                    paper_fill_id: row.get(0)?,
+                    intent_id: row.get(1)?,
+                    entry_price: parse_decimal_or_zero(row.get::<_, Option<String>>(2)?),
+                    shares: parse_decimal_or_zero(row.get::<_, Option<String>>(3)?),
+                    notional_usdc: parse_decimal_or_zero(row.get::<_, Option<String>>(4)?),
+                    opened_at: row.get(5)?,
+                })
+            })?;
+            rows.collect::<std::result::Result<Vec<_>, _>>()?
+        };
+
+        let mut closed_lots = 0;
+        let mut realized_pnl_usdc = Decimal::ZERO;
+        for lot in lots {
+            if remaining <= Decimal::ZERO {
+                break;
+            }
+            if lot.shares <= Decimal::ZERO {
+                continue;
+            }
+            let close_shares = min_decimal(remaining, lot.shares);
+            let cost_basis = if lot.entry_price > Decimal::ZERO {
+                lot.entry_price * close_shares
+            } else {
+                lot.notional_usdc * close_shares / lot.shares
+            };
+            let proceeds = exit_price * close_shares;
+            let pnl = proceeds - cost_basis;
+            let pnl_bps = if cost_basis > Decimal::ZERO {
+                pnl / cost_basis * Decimal::from(10_000)
+            } else {
+                Decimal::ZERO
+            };
+            tx.execute(
+                r#"
+                UPDATE paper_fills
+                SET shares = ?1,
+                    notional_usdc = ?2,
+                    status = 'closed',
+                    exit_price = ?3,
+                    exit_at = datetime('now'),
+                    pnl_usdc = ?4,
+                    pnl_bps = ?5
+                WHERE paper_fill_id = ?6
+                "#,
+                params![
+                    close_shares.to_string(),
+                    cost_basis.to_string(),
+                    exit_price.to_string(),
+                    pnl.to_string(),
+                    pnl_bps.to_string(),
+                    lot.paper_fill_id,
+                ],
+            )?;
+
+            let residual_shares = lot.shares - close_shares;
+            if residual_shares > Decimal::ZERO {
+                let residual_notional = lot.notional_usdc - cost_basis;
+                let residual_id = format!(
+                    "paper:remaining:{}:{}",
+                    lot.paper_fill_id,
+                    chrono::Utc::now().timestamp_micros()
+                );
+                tx.execute(
+                    r#"
+                    INSERT INTO paper_fills (
+                        paper_fill_id, intent_id, entry_price, shares, notional_usdc,
+                        status, opened_at
+                    )
+                    VALUES (?1, ?2, ?3, ?4, ?5, 'open', ?6)
+                    "#,
+                    params![
+                        residual_id,
+                        lot.intent_id,
+                        lot.entry_price.to_string(),
+                        residual_shares.to_string(),
+                        residual_notional.to_string(),
+                        lot.opened_at,
+                    ],
+                )?;
+            }
+
+            remaining -= close_shares;
+            closed_lots += 1;
+            realized_pnl_usdc += pnl;
+        }
+        tx.commit()?;
+        Ok(PaperExecutionResult {
+            opened_fills: 0,
+            closed_lots,
+            realized_pnl_usdc,
+        })
+    }
+}
+
+struct OpenPaperLot {
+    paper_fill_id: String,
+    intent_id: String,
+    entry_price: Decimal,
+    shares: Decimal,
+    notional_usdc: Decimal,
+    opened_at: String,
 }
 
 fn verdict_label(verdict: IntentVerdict) -> &'static str {
@@ -422,4 +615,97 @@ fn parse_decimal_or_zero(value: Option<String>) -> Decimal {
     value
         .and_then(|value| value.parse::<Decimal>().ok())
         .unwrap_or(Decimal::ZERO)
+}
+
+fn min_decimal(left: Decimal, right: Decimal) -> Decimal {
+    if left <= right { left } else { right }
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::Utc;
+    use rust_decimal_macros::dec;
+
+    use super::*;
+
+    #[test]
+    fn paper_sell_closes_fifo_and_records_realized_pnl() {
+        let path = std::env::temp_dir().join(format!(
+            "polyfollow-fifo-{}.sqlite",
+            chrono::Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        let mut storage = Storage::open(&path).unwrap();
+        let leader = "0x2222222222222222222222222222222222222222";
+        let token_id = "123";
+
+        let buy_one = intent(
+            "buy-1",
+            leader,
+            token_id,
+            TradeSide::Buy,
+            dec!(0.4),
+            dec!(40),
+        );
+        let buy_two = intent(
+            "buy-2",
+            leader,
+            token_id,
+            TradeSide::Buy,
+            dec!(0.6),
+            dec!(60),
+        );
+        storage.insert_copy_intent(&buy_one).unwrap();
+        storage.apply_paper_intent(&buy_one).unwrap();
+        storage.insert_copy_intent(&buy_two).unwrap();
+        storage.apply_paper_intent(&buy_two).unwrap();
+
+        let mut sell = intent(
+            "sell-1",
+            leader,
+            token_id,
+            TradeSide::Sell,
+            dec!(0.5),
+            dec!(75),
+        );
+        sell.shares = Some(dec!(150));
+        storage.insert_copy_intent(&sell).unwrap();
+        let result = storage.apply_paper_intent(&sell).unwrap();
+
+        assert_eq!(result.closed_lots, 2);
+        assert_eq!(result.realized_pnl_usdc, dec!(5.0));
+        assert_eq!(
+            storage
+                .leader_token_open_shares(leader, Some(token_id))
+                .unwrap(),
+            dec!(50)
+        );
+        assert_eq!(storage.pnl_summary().unwrap().realized_pnl_usdc, "5.0");
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    fn intent(
+        trade_id: &str,
+        leader: &str,
+        token_id: &str,
+        side: TradeSide,
+        price: Decimal,
+        notional: Decimal,
+    ) -> CopyIntent {
+        CopyIntent {
+            intent_id: format!("intent:{leader}:{trade_id}"),
+            leader_address: leader.to_string(),
+            trade_id: trade_id.to_string(),
+            mode: "paper".to_string(),
+            side,
+            market_id: Some("condition-1".to_string()),
+            token_id: Some(token_id.to_string()),
+            target_price: Some(price),
+            notional_usdc: notional,
+            shares: Some(notional / price),
+            verdict: IntentVerdict::Paper,
+            reasons: Vec::new(),
+            created_at: Utc::now(),
+        }
+    }
 }

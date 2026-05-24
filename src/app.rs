@@ -11,7 +11,7 @@ use crate::config::{
     self, AppConfig, CopyConfig, CopyMode, ExecutionMode, LeaderConfig, LeaderRiskConfig,
 };
 use crate::engine::{RiskContext, build_intent};
-use crate::execution::{LiveExecutionConfig, execute_live_market_order, paper_fill_for};
+use crate::execution::{LiveExecutionConfig, execute_live_market_order};
 use crate::market::OrderBookClient;
 use crate::monitor::ActivityPoller;
 use crate::output::print_json;
@@ -398,6 +398,14 @@ async fn run_once(
                 leader_daily_notional_usdc: storage.leader_daily_notional(&leader.address)?,
                 market_open_notional_usdc: storage
                     .leader_market_open_notional(&leader.address, trade.condition_id.as_deref())?,
+                available_position_shares: if trade.side == crate::types::TradeSide::Sell {
+                    Some(
+                        storage
+                            .leader_token_open_shares(&leader.address, trade.token_id.as_deref())?,
+                    )
+                } else {
+                    None
+                },
                 book: None,
                 book_error: None,
             };
@@ -421,9 +429,9 @@ async fn run_once(
             }
             stats.new_trades += 1;
             storage.insert_copy_intent(&intent)?;
-            if let Some(fill) = paper_fill_for(&intent) {
-                storage.insert_paper_fill(&fill)?;
-                stats.paper_fills += 1;
+            if intent.verdict == crate::types::IntentVerdict::Paper {
+                let result = storage.apply_paper_intent(&intent)?;
+                stats.paper_fills += result.opened_fills + result.closed_lots;
             } else if intent.verdict == crate::types::IntentVerdict::Live {
                 let request = serde_json::to_value(&intent)?;
                 match execute_live_market_order(

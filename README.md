@@ -45,6 +45,8 @@ Paper mode polls the Polymarket Data API, normalizes leader trades,
 deduplicates them, enriches with CLOB order-book checks when token ids are
 available, builds copy intents, and records paper fills. Live mode submits
 market FAK orders to the Polymarket CLOB only after all risk checks pass.
+Paper sells are matched against tracked paper buys using FIFO, so `pnl` can
+show realized PnL instead of only open notional.
 
 ## Design
 

@@ -9,10 +9,10 @@ use polymarket_client_sdk::clob::types::{Amount, OrderType, Side, SignatureType}
 use polymarket_client_sdk::types::{Decimal as SdkDecimal, U256};
 
 use crate::config::AccountConfig;
-use crate::types::{CopyIntent, IntentVerdict, PaperFill};
+use crate::types::{CopyIntent, IntentVerdict, PaperFill, TradeSide};
 
 pub fn paper_fill_for(intent: &CopyIntent) -> Option<PaperFill> {
-    if intent.verdict != IntentVerdict::Paper {
+    if intent.verdict != IntentVerdict::Paper || intent.side != TradeSide::Buy {
         return None;
     }
     Some(PaperFill {

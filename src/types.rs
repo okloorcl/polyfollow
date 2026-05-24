@@ -75,3 +75,10 @@ pub struct PaperFill {
     pub status: String,
     pub opened_at: DateTime<Utc>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaperExecutionResult {
+    pub opened_fills: usize,
+    pub closed_lots: usize,
+    pub realized_pnl_usdc: Decimal,
+}

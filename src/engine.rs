@@ -9,6 +9,7 @@ use crate::types::{CopyIntent, IntentVerdict, LeaderTrade, TradeSide};
 pub struct RiskContext {
     pub leader_daily_notional_usdc: Decimal,
     pub market_open_notional_usdc: Decimal,
+    pub available_position_shares: Option<Decimal>,
     pub book: Option<BookMetrics>,
     pub book_error: Option<&'static str>,
 }
@@ -41,7 +42,7 @@ pub fn build_intent(
         CopyMode::Ratio => trade.notional_usdc * leader.copy.ratio,
         CopyMode::Fixed => leader.copy.fixed_order_usdc,
     };
-    let notional_usdc = min_decimal(calculated_notional, leader.risk.max_order_usdc);
+    let mut notional_usdc = min_decimal(calculated_notional, leader.risk.max_order_usdc);
     if notional_usdc <= Decimal::ZERO {
         reasons.push("copy notional is zero".to_string());
     }
@@ -113,10 +114,28 @@ pub fn build_intent(
         }
     }
 
-    let shares = trade
+    let mut shares = trade
         .price
         .filter(|price| *price > Decimal::ZERO)
         .map(|price| notional_usdc / price);
+    if trade.side == TradeSide::Sell {
+        match (risk_context.available_position_shares, shares, trade.price) {
+            (Some(available), _, _) if available <= Decimal::ZERO => {
+                reasons.push("no open tracked position to sell".to_string());
+            }
+            (Some(available), Some(requested), Some(price)) if requested > available => {
+                shares = Some(available);
+                notional_usdc = available * price;
+            }
+            (Some(_), Some(_), _) => {}
+            (Some(_), None, _) => {
+                reasons.push("sell requires a valid price to compute shares".to_string());
+            }
+            (None, _, _) => {
+                reasons.push("sell requires tracked position context".to_string());
+            }
+        }
+    }
 
     let verdict = if reasons.is_empty() {
         match mode {
@@ -223,6 +242,57 @@ mod tests {
         );
         assert_eq!(intent.notional_usdc, dec!(20));
         assert_eq!(intent.shares, Some(dec!(40)));
+        assert_eq!(intent.verdict, IntentVerdict::Paper);
+    }
+
+    #[test]
+    fn sell_intent_caps_to_tracked_position() {
+        let leader = LeaderConfig {
+            address: "0x2222222222222222222222222222222222222222".to_string(),
+            label: None,
+            enabled: true,
+            copy: CopyConfig {
+                mode: CopyMode::Ratio,
+                ratio: dec!(1),
+                fixed_order_usdc: dec!(10),
+            },
+            risk: LeaderRiskConfig {
+                max_order_usdc: dec!(100),
+                ..LeaderRiskConfig::default()
+            },
+            filters: Default::default(),
+        };
+        let trade = LeaderTrade {
+            leader_address: leader.address.clone(),
+            trade_id: "tx-sell".to_string(),
+            source: "test".to_string(),
+            source_timestamp: Utc::now(),
+            received_at: Utc::now(),
+            latency_ms: 100,
+            side: TradeSide::Sell,
+            condition_id: Some("market-1".to_string()),
+            token_id: Some("123".to_string()),
+            title: None,
+            slug: None,
+            event_slug: None,
+            outcome: None,
+            outcome_index: None,
+            price: Some(dec!(0.5)),
+            shares: Some(dec!(100)),
+            notional_usdc: dec!(50),
+            raw_json: serde_json::json!({}),
+        };
+        let intent = build_intent(
+            ExecutionMode::Paper,
+            &leader,
+            &trade,
+            RiskContext {
+                available_position_shares: Some(dec!(20)),
+                ..RiskContext::default()
+            },
+        );
+        assert_eq!(intent.notional_usdc, dec!(10.0));
+        assert_eq!(intent.shares, Some(dec!(20)));
         assert_eq!(intent.verdict, IntentVerdict::Paper);
     }
 }

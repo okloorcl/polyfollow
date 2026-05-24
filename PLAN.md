@@ -56,7 +56,7 @@ leader sources
 - [x] Native live Polymarket CLOB order execution using the official Rust SDK.
 - [ ] CLOB websocket or activity websocket monitor.
 - [ ] On-chain websocket backup monitor.
-- [ ] FIFO sell matching.
+- [x] FIFO sell matching for paper positions and realized PnL.
 - [ ] Multi-account allocation.
 - [ ] Webhook/Telegram notifications.
 - [ ] Import leader scores from PolyAlpha.
