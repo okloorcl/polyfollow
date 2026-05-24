@@ -17,6 +17,8 @@ pub struct AppConfig {
     #[serde(default)]
     pub account: AccountConfig,
     #[serde(default)]
+    pub accounts: Vec<AccountConfig>,
+    #[serde(default)]
     pub notifications: NotificationConfig,
     #[serde(default)]
     pub leaders: Vec<LeaderConfig>,
@@ -73,6 +75,8 @@ pub struct LeaderConfig {
     pub address: String,
     #[serde(default)]
     pub label: Option<String>,
+    #[serde(default)]
+    pub account_name: Option<String>,
     #[serde(default = "default_true")]
     pub enabled: bool,
     #[serde(default)]
@@ -143,6 +147,7 @@ impl Default for AppConfig {
         Self {
             global: GlobalConfig::default(),
             account: AccountConfig::default(),
+            accounts: Vec::new(),
             notifications: NotificationConfig::default(),
             leaders: Vec::new(),
         }
@@ -207,9 +212,29 @@ impl AppConfig {
         if let Some(wallet) = &self.account.wallet {
             validate_address(wallet).context("account.wallet is not a valid address")?;
         }
+        let mut account_names = std::collections::HashSet::new();
+        account_names.insert(self.account.name.clone());
+        for account in &self.accounts {
+            if !account_names.insert(account.name.clone()) {
+                anyhow::bail!("duplicate account name: {}", account.name);
+            }
+            if let Some(wallet) = &account.wallet {
+                validate_address(wallet)
+                    .with_context(|| format!("account {} wallet is invalid", account.name))?;
+            }
+        }
         for leader in &self.leaders {
             validate_address(&leader.address)
                 .with_context(|| format!("leader address is invalid: {}", leader.address))?;
+            if let Some(account_name) = &leader.account_name
+                && !account_names.contains(account_name)
+            {
+                anyhow::bail!(
+                    "leader {} references unknown account_name {}",
+                    leader.address,
+                    account_name
+                );
+            }
             if leader.copy.ratio < Decimal::ZERO {
                 anyhow::bail!("leader {} copy.ratio must be non-negative", leader.address);
             }
@@ -255,6 +280,19 @@ impl AppConfig {
             .iter_mut()
             .find(|leader| leader.address.eq_ignore_ascii_case(&address))
             .ok_or_else(|| anyhow::anyhow!("leader not found: {address}"))
+    }
+
+    pub fn account_for_leader(&self, leader: &LeaderConfig) -> Result<&AccountConfig> {
+        let Some(account_name) = leader.account_name.as_deref() else {
+            return Ok(&self.account);
+        };
+        if self.account.name == account_name {
+            return Ok(&self.account);
+        }
+        self.accounts
+            .iter()
+            .find(|account| account.name == account_name)
+            .ok_or_else(|| anyhow::anyhow!("unknown account_name: {account_name}"))
     }
 }
 

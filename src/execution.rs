@@ -34,9 +34,15 @@ pub struct LiveExecutionConfig {
 
 impl LiveExecutionConfig {
     pub fn from_env(account: &AccountConfig) -> Result<Self> {
-        let private_key = std::env::var("POLYFOLLOW_PRIVATE_KEY")
+        let account_key = account_private_key_env(&account.name);
+        let private_key = std::env::var(&account_key)
+            .or_else(|_| std::env::var("POLYFOLLOW_PRIVATE_KEY"))
             .or_else(|_| std::env::var("POLYMARKET_PRIVATE_KEY"))
-            .context("set POLYFOLLOW_PRIVATE_KEY or POLYMARKET_PRIVATE_KEY for live mode")?;
+            .with_context(|| {
+                format!(
+                    "set {account_key}, POLYFOLLOW_PRIVATE_KEY, or POLYMARKET_PRIVATE_KEY for live mode"
+                )
+            })?;
         Ok(Self {
             private_key,
             signature_type: parse_signature_type(&account.signature_type),
@@ -98,4 +104,18 @@ fn parse_signature_type(value: &str) -> SignatureType {
         "gnosis-safe" => SignatureType::GnosisSafe,
         _ => SignatureType::Eoa,
     }
+}
+
+fn account_private_key_env(account_name: &str) -> String {
+    let suffix = account_name
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() {
+                ch.to_ascii_uppercase()
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+    format!("POLYFOLLOW_PRIVATE_KEY_{suffix}")
 }

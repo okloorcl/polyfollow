@@ -57,7 +57,7 @@ leader sources
 - [ ] CLOB websocket or activity websocket monitor.
 - [ ] On-chain websocket backup monitor.
 - [x] FIFO sell matching for paper positions and realized PnL.
-- [ ] Multi-account allocation.
+- [x] Multi-account leader allocation with per-account live key env lookup.
 - [x] Webhook/Telegram notifications for copy intents.
 - [x] Import leader scores from PolyAlpha JSON exports or SQLite.
 - [x] Local read-only HTTP API for status, leaders, orders, logs, and PnL.

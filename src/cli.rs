@@ -100,6 +100,10 @@ pub struct LeaderAddArgs {
     #[arg(long)]
     pub label: Option<String>,
 
+    /// Account name from config.account or config.accounts.
+    #[arg(long)]
+    pub account: Option<String>,
+
     /// Ratio mode: copy leader notional * copy_ratio.
     #[arg(long, conflicts_with = "fixed_order")]
     pub copy_ratio: Option<String>,
@@ -139,6 +143,9 @@ pub struct LeaderUpdateArgs {
 
     #[arg(long)]
     pub enabled: Option<bool>,
+
+    #[arg(long)]
+    pub account: Option<String>,
 
     #[arg(long)]
     pub copy_ratio: Option<String>,

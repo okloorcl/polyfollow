@@ -202,6 +202,7 @@ mod tests {
         let leader = LeaderConfig {
             address: "0x2222222222222222222222222222222222222222".to_string(),
             label: None,
+            account_name: None,
             enabled: true,
             copy: CopyConfig {
                 mode: CopyMode::Ratio,
@@ -250,6 +251,7 @@ mod tests {
         let leader = LeaderConfig {
             address: "0x2222222222222222222222222222222222222222".to_string(),
             label: None,
+            account_name: None,
             enabled: true,
             copy: CopyConfig {
                 mode: CopyMode::Ratio,

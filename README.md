@@ -19,6 +19,7 @@ private key.
 polyfollow setup
 polyfollow leader add 0xabc... \
   --label "weather specialist" \
+  --account main \
   --copy-ratio 0.10 \
   --max-order 20 \
   --max-daily 100
@@ -140,7 +141,17 @@ Optional account signature type in `config.toml`:
 ```toml
 [account]
 signature_type = "proxy" # proxy, eoa, or gnosis-safe
+
+[[accounts]]
+name = "research"
+wallet = "0x..."
+signature_type = "proxy"
 ```
+
+Leaders can be assigned to an account with `--account research`. Live mode looks
+for account-specific private keys first, for example
+`POLYFOLLOW_PRIVATE_KEY_RESEARCH`, then falls back to `POLYFOLLOW_PRIVATE_KEY`
+and `POLYMARKET_PRIVATE_KEY`.
 
 ## Notifications
 

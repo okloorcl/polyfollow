@@ -130,17 +130,18 @@ pub async fn run(cli: Cli) -> Result<()> {
             if matches!(mode, ExecutionMode::Live) && !args.confirm_live {
                 anyhow::bail!("live mode requires --confirm-live");
             }
-            let live_config = if matches!(mode, ExecutionMode::Live) {
-                Some(LiveExecutionConfig::from_env(&cfg.account)?)
-            } else {
-                None
-            };
+            if matches!(mode, ExecutionMode::Live) {
+                for leader in cfg.leaders.iter().filter(|leader| leader.enabled) {
+                    let account = cfg.account_for_leader(leader)?;
+                    LiveExecutionConfig::from_env(account)?;
+                }
+            }
             let mut storage = Storage::open(&db_path(db_override.as_ref(), &cfg))?;
             storage.sync_leaders(&cfg.leaders)?;
             let run_stats = if args.once {
-                run_once(&cfg, &mut storage, mode, args.limit, live_config.as_ref()).await?
+                run_once(&cfg, &mut storage, mode, args.limit).await?
             } else {
-                run_loop(&cfg, &mut storage, mode, args.limit, live_config.as_ref()).await?
+                run_loop(&cfg, &mut storage, mode, args.limit).await?
             };
             let response = RunResponse {
                 mode,
@@ -311,6 +312,7 @@ fn leader_from_candidate(
     LeaderConfig {
         address: candidate.address.clone(),
         label: Some(candidate.label.clone()),
+        account_name: None,
         enabled: true,
         copy: CopyConfig {
             mode: CopyMode::Ratio,
@@ -353,6 +355,7 @@ fn leader_from_add(args: LeaderAddArgs) -> Result<LeaderConfig> {
     Ok(LeaderConfig {
         address: normalize_address(&args.address)?,
         label: args.label,
+        account_name: args.account,
         enabled: true,
         copy,
         risk,
@@ -366,6 +369,9 @@ fn leader_from_add(args: LeaderAddArgs) -> Result<LeaderConfig> {
 fn apply_leader_update(leader: &mut LeaderConfig, args: LeaderUpdateArgs) -> Result<()> {
     if let Some(label) = args.label {
         leader.label = Some(label);
+    }
+    if let Some(account) = args.account {
+        leader.account_name = Some(account);
     }
     if let Some(enabled) = args.enabled {
         leader.enabled = enabled;
@@ -457,7 +463,6 @@ async fn run_once(
     storage: &mut Storage,
     mode: ExecutionMode,
     limit: usize,
-    live_config: Option<&LiveExecutionConfig>,
 ) -> Result<RunStats> {
     if cfg.global.kill_switch {
         anyhow::bail!("global kill switch is enabled");
@@ -518,12 +523,9 @@ async fn run_once(
                 notifier.notify_intent(&intent, Some(&result)).await;
             } else if intent.verdict == crate::types::IntentVerdict::Live {
                 let request = serde_json::to_value(&intent)?;
-                match execute_live_market_order(
-                    live_config.ok_or_else(|| anyhow::anyhow!("missing live config"))?,
-                    &intent,
-                )
-                .await
-                {
+                let account = cfg.account_for_leader(leader)?;
+                let live_config = LiveExecutionConfig::from_env(account)?;
+                match execute_live_market_order(&live_config, &intent).await {
                     Ok(response) => {
                         storage.insert_live_attempt(
                             &intent.intent_id,
@@ -557,11 +559,10 @@ async fn run_loop(
     storage: &mut Storage,
     mode: ExecutionMode,
     limit: usize,
-    live_config: Option<&LiveExecutionConfig>,
 ) -> Result<RunStats> {
     let mut total = RunStats::default();
     loop {
-        let stats = run_once(cfg, storage, mode, limit, live_config).await?;
+        let stats = run_once(cfg, storage, mode, limit).await?;
         total.fetched_trades += stats.fetched_trades;
         total.new_trades += stats.new_trades;
         total.blocked_intents += stats.blocked_intents;
