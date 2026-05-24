@@ -127,6 +127,15 @@ curl 'http://127.0.0.1:8787/logs?limit=20'
 curl http://127.0.0.1:8787/pnl
 ```
 
+## CLOB Websocket Watcher
+
+Watch live order-book events for one or more Polymarket token ids:
+
+```bash
+polyfollow watch-clob --asset 123456789 --once --json
+polyfollow watch-clob --assets-file token_ids.txt
+```
+
 ## Live Safety
 
 Live trading requires all of these:

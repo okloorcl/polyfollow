@@ -54,7 +54,7 @@ leader sources
 ## P1 Scope
 
 - [x] Native live Polymarket CLOB order execution using the official Rust SDK.
-- [ ] CLOB websocket or activity websocket monitor.
+- [x] CLOB market websocket monitor for token/asset ids.
 - [ ] On-chain websocket backup monitor.
 - [x] FIFO sell matching for paper positions and realized PnL.
 - [x] Multi-account leader allocation with per-account live key env lookup.

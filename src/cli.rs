@@ -53,6 +53,8 @@ pub enum Command {
     Logs(LimitArgs),
     /// Start a local read-only HTTP API.
     Serve(ServeArgs),
+    /// Watch Polymarket CLOB market websocket events for token ids.
+    WatchClob(WatchClobArgs),
 }
 
 #[derive(Debug, Args)]
@@ -237,6 +239,36 @@ pub struct ServeArgs {
     /// Bind address for the local HTTP API.
     #[arg(long, default_value = "127.0.0.1:8787")]
     pub addr: String,
+}
+
+#[derive(Debug, Args)]
+pub struct WatchClobArgs {
+    /// CLOB market websocket URL.
+    #[arg(
+        long,
+        default_value = "wss://ws-subscriptions-clob.polymarket.com/ws/market"
+    )]
+    pub ws_url: String,
+
+    /// Token/asset id to subscribe. Repeatable.
+    #[arg(long = "asset")]
+    pub assets: Vec<String>,
+
+    /// File with one token/asset id per line.
+    #[arg(long)]
+    pub assets_file: Option<PathBuf>,
+
+    /// Send one subscription per chunk.
+    #[arg(long, default_value_t = 500)]
+    pub chunk_size: usize,
+
+    /// Send PING every N seconds.
+    #[arg(long, default_value_t = 10)]
+    pub ping_secs: u64,
+
+    /// Exit after first event payload.
+    #[arg(long)]
+    pub once: bool,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]

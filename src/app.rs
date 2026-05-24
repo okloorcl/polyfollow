@@ -21,6 +21,7 @@ use crate::polyalpha::{PolyAlphaCandidate, load_candidates};
 use crate::server;
 use crate::storage::Storage;
 use crate::validate::normalize_address;
+use crate::watch;
 
 pub async fn run(cli: Cli) -> Result<()> {
     let config_path = config_path(&cli)?;
@@ -222,6 +223,7 @@ pub async fn run(cli: Cli) -> Result<()> {
             let db_path = db_path(db_override.as_ref(), &cfg);
             server::serve(cfg, db_path, &args.addr).await
         }
+        Command::WatchClob(args) => watch::watch_clob(args, json).await,
     }
 }
 
