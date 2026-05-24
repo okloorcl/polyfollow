@@ -11,6 +11,7 @@ use crate::backtest;
 use crate::chain;
 use crate::cli::{Cli, Command, ConfigCommand};
 use crate::config::{self, AppConfig, ExecutionMode};
+use crate::cooldown;
 use crate::dashboard;
 use crate::execution::LiveExecutionConfig;
 use crate::output::print_json;
@@ -274,6 +275,28 @@ pub async fn run(cli: Cli) -> Result<()> {
                         row.budget_usdc,
                         row.suggested_max_order_usdc,
                         row.suggested_max_daily_usdc
+                    );
+                }
+            })
+        }
+        Command::Cooldown(args) => {
+            let mut cfg = config::load_or_default(&config_path)?;
+            let storage = Storage::open(&db_path(db_override.as_ref(), &cfg))?;
+            let report =
+                cooldown::audit_and_apply(&mut cfg, &storage, args.blocked_threshold, args.apply)?;
+            if args.apply {
+                config::save(&config_path, &cfg)?;
+            }
+            print_response(json, &report, || {
+                println!(
+                    "Cooldown: threshold={} candidates={}",
+                    report.threshold,
+                    report.candidates.len()
+                );
+                for candidate in &report.candidates {
+                    println!(
+                        "{} blocked={} disabled={}",
+                        candidate.leader_address, candidate.blocked_intents, candidate.disabled
                     );
                 }
             })

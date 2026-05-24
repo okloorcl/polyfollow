@@ -4,6 +4,7 @@ mod backtest;
 mod chain;
 mod cli;
 mod config;
+mod cooldown;
 mod dashboard;
 mod engine;
 mod execution;

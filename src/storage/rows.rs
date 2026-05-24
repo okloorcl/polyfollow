@@ -43,3 +43,9 @@ pub struct PnlSummary {
     pub open_notional_usdc: String,
     pub realized_pnl_usdc: String,
 }
+
+#[derive(Debug, Serialize)]
+pub struct LeaderBlockedCount {
+    pub leader_address: String,
+    pub blocked_intents: usize,
+}

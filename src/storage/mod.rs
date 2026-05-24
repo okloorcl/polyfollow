@@ -13,7 +13,7 @@ mod tests;
 
 use crate::types::{CopyIntent, IntentVerdict, LeaderTrade, PaperFill};
 
-pub use rows::{IntentRow, PnlSummary, StorageStatus, TradeLogRow};
+pub use rows::{IntentRow, LeaderBlockedCount, PnlSummary, StorageStatus, TradeLogRow};
 
 pub struct Storage {
     conn: Connection,
@@ -303,6 +303,26 @@ impl Storage {
             |row| row.get(0),
         )?;
         Ok(parse_decimal_or_zero(value))
+    }
+
+    pub fn blocked_counts_by_leader(&self) -> Result<Vec<LeaderBlockedCount>> {
+        let mut stmt = self.conn.prepare(
+            r#"
+            SELECT leader_address, COUNT(*)
+            FROM copy_intents
+            WHERE verdict = 'blocked'
+            GROUP BY leader_address
+            ORDER BY COUNT(*) DESC
+            "#,
+        )?;
+        let rows = stmt.query_map([], |row| {
+            let count: i64 = row.get(1)?;
+            Ok(LeaderBlockedCount {
+                leader_address: row.get(0)?,
+                blocked_intents: count.max(0) as usize,
+            })
+        })?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 
     fn count(&self, table: &str) -> Result<i64> {

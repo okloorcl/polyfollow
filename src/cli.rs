@@ -63,6 +63,8 @@ pub enum Command {
     Backtest(BacktestArgs),
     /// Suggest or apply portfolio-level leader risk allocations.
     Allocate(AllocateArgs),
+    /// Audit blocked leaders and optionally disable noisy leaders.
+    Cooldown(CooldownArgs),
 }
 
 #[derive(Debug, Args)]
@@ -346,6 +348,17 @@ pub struct AllocateArgs {
     pub daily_fraction: String,
 
     /// Write suggested caps back to config.
+    #[arg(long)]
+    pub apply: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct CooldownArgs {
+    /// Disable/suggest leaders with at least this many blocked intents.
+    #[arg(long, default_value_t = 5)]
+    pub blocked_threshold: usize,
+
+    /// Write disabled leaders back to config.
     #[arg(long)]
     pub apply: bool,
 }

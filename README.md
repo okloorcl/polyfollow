@@ -150,6 +150,13 @@ polyfollow allocate --capital 1000 --order-fraction 0.02 --daily-fraction 0.10
 polyfollow allocate --capital 1000 --apply
 ```
 
+Audit or disable leaders that repeatedly fail risk checks:
+
+```bash
+polyfollow cooldown --blocked-threshold 5
+polyfollow cooldown --blocked-threshold 5 --apply
+```
+
 ## CLOB Websocket Watcher
 
 Watch live order-book events for one or more Polymarket token ids:
