@@ -98,6 +98,20 @@ polyfollow --json logs
 polyfollow --json status
 ```
 
+## Local HTTP API
+
+The local API is read-only in this milestone, so dashboards and agents can read
+state without receiving an HTTP trading endpoint.
+
+```bash
+polyfollow serve --addr 127.0.0.1:8787
+curl http://127.0.0.1:8787/health
+curl http://127.0.0.1:8787/status
+curl 'http://127.0.0.1:8787/orders?limit=20'
+curl 'http://127.0.0.1:8787/logs?limit=20'
+curl http://127.0.0.1:8787/pnl
+```
+
 ## Live Safety
 
 Live trading requires all of these:

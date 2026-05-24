@@ -51,6 +51,8 @@ pub enum Command {
     Pnl,
     /// Show recent observed leader trades.
     Logs(LimitArgs),
+    /// Start a local read-only HTTP API.
+    Serve(ServeArgs),
 }
 
 #[derive(Debug, Args)]
@@ -189,6 +191,13 @@ pub struct RunArgs {
 pub struct LimitArgs {
     #[arg(long, default_value_t = 20)]
     pub limit: usize,
+}
+
+#[derive(Debug, Args)]
+pub struct ServeArgs {
+    /// Bind address for the local HTTP API.
+    #[arg(long, default_value = "127.0.0.1:8787")]
+    pub addr: String,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]

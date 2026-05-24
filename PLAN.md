@@ -60,7 +60,7 @@ leader sources
 - [ ] Multi-account allocation.
 - [x] Webhook/Telegram notifications for copy intents.
 - [ ] Import leader scores from PolyAlpha.
-- [ ] Local HTTP API.
+- [x] Local read-only HTTP API for status, leaders, orders, logs, and PnL.
 
 ## P2 Scope
 

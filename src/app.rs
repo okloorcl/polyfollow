@@ -16,6 +16,7 @@ use crate::market::OrderBookClient;
 use crate::monitor::ActivityPoller;
 use crate::notify::Notifier;
 use crate::output::print_json;
+use crate::server;
 use crate::storage::Storage;
 use crate::validate::normalize_address;
 
@@ -212,6 +213,11 @@ pub async fn run(cli: Cli) -> Result<()> {
                     );
                 }
             })
+        }
+        Command::Serve(args) => {
+            let cfg = config::load_or_default(&config_path)?;
+            let db_path = db_path(db_override.as_ref(), &cfg);
+            server::serve(cfg, db_path, &args.addr).await
         }
     }
 }
