@@ -1,8 +1,12 @@
 mod app;
 mod cli;
 mod config;
+mod engine;
+mod execution;
+mod monitor;
 mod output;
 mod storage;
+mod types;
 mod validate;
 
 use anyhow::Result;

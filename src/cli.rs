@@ -45,12 +45,12 @@ pub enum Command {
     Doctor,
     /// Start paper or live follow loop.
     Run(RunArgs),
-    /// List observed/copy orders. Placeholder until execution lands.
-    Orders,
-    /// Show PnL summary. Placeholder until paper/live fills land.
+    /// List recent copy intents.
+    Orders(LimitArgs),
+    /// Show paper/live PnL summary.
     Pnl,
-    /// Show audit logs. Placeholder until monitor lands.
-    Logs,
+    /// Show recent observed leader trades.
+    Logs(LimitArgs),
 }
 
 #[derive(Debug, Args)]
@@ -179,6 +179,16 @@ pub struct RunArgs {
     /// Run one polling cycle and exit.
     #[arg(long)]
     pub once: bool,
+
+    /// Max activities to request per leader per polling cycle.
+    #[arg(long, default_value_t = 100)]
+    pub limit: usize,
+}
+
+#[derive(Debug, Args)]
+pub struct LimitArgs {
+    #[arg(long, default_value_t = 20)]
+    pub limit: usize,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]

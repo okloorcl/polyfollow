@@ -27,7 +27,7 @@ polyfollow leader add 0xdef... \
   --no-sell
 
 polyfollow leader list
-polyfollow run --paper
+polyfollow run --paper --once
 polyfollow status
 polyfollow pnl
 ```
@@ -37,6 +37,10 @@ Live trading will stay blocked unless invoked explicitly:
 ```bash
 polyfollow run --live --confirm-live
 ```
+
+Live execution is intentionally blocked in the current milestone. Paper mode
+already polls the Polymarket Data API, normalizes leader trades, deduplicates
+them, builds copy intents, and records paper fills.
 
 ## Design
 
@@ -80,5 +84,8 @@ Human output is the default. Add `--json` for agents:
 
 ```bash
 polyfollow --json leader list
+polyfollow --json run --paper --once --limit 50
+polyfollow --json orders
+polyfollow --json logs
 polyfollow --json status
 ```

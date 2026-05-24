@@ -10,6 +10,9 @@ use crate::cli::{
 use crate::config::{
     self, AppConfig, CopyConfig, CopyMode, ExecutionMode, LeaderConfig, LeaderRiskConfig,
 };
+use crate::engine::{RiskContext, build_intent};
+use crate::execution::paper_fill_for;
+use crate::monitor::ActivityPoller;
 use crate::output::print_json;
 use crate::storage::Storage;
 use crate::validate::normalize_address;
@@ -125,22 +128,86 @@ pub async fn run(cli: Cli) -> Result<()> {
             if matches!(mode, ExecutionMode::Live) {
                 anyhow::bail!("live execution is not implemented yet; paper mode is available");
             }
+            let mut storage = Storage::open(&db_path(db_override.as_ref(), &cfg))?;
+            storage.sync_leaders(&cfg.leaders)?;
+            let run_stats = if args.once {
+                run_once(&cfg, &mut storage, mode, args.limit).await?
+            } else {
+                run_loop(&cfg, &mut storage, mode, args.limit).await?
+            };
             let response = RunResponse {
                 mode,
                 once: args.once,
                 enabled_leaders: cfg.leaders.iter().filter(|leader| leader.enabled).count(),
-                message: "monitor and paper execution will land in the next milestone".to_string(),
+                fetched_trades: run_stats.fetched_trades,
+                new_trades: run_stats.new_trades,
+                blocked_intents: run_stats.blocked_intents,
+                paper_fills: run_stats.paper_fills,
+                message: "completed polling".to_string(),
             };
             print_response(json, &response, || {
                 println!(
-                    "Run: {:?}, enabled leaders={}, once={}",
-                    response.mode, response.enabled_leaders, response.once
+                    "Run: {:?}, enabled leaders={}, once={}, fetched={}, new={}, paper={}, blocked={}",
+                    response.mode,
+                    response.enabled_leaders,
+                    response.once,
+                    response.fetched_trades,
+                    response.new_trades,
+                    response.paper_fills,
+                    response.blocked_intents
                 );
                 println!("{}", response.message);
             })
         }
-        Command::Orders | Command::Pnl | Command::Logs => {
-            anyhow::bail!("this report command will be implemented with paper/live execution")
+        Command::Orders(args) => {
+            let cfg = config::load_or_default(&config_path)?;
+            let storage = Storage::open(&db_path(db_override.as_ref(), &cfg))?;
+            let rows = storage.recent_intents(args.limit)?;
+            print_response(json, &rows, || {
+                if rows.is_empty() {
+                    println!("No copy intents yet.");
+                    return;
+                }
+                for row in &rows {
+                    println!(
+                        "{} {} {} notional={} verdict={} at={}",
+                        row.side,
+                        row.leader_address,
+                        row.trade_id,
+                        row.notional_usdc,
+                        row.verdict,
+                        row.created_at
+                    );
+                }
+            })
+        }
+        Command::Pnl => {
+            let cfg = config::load_or_default(&config_path)?;
+            let storage = Storage::open(&db_path(db_override.as_ref(), &cfg))?;
+            let summary = storage.pnl_summary()?;
+            print_response(json, &summary, || {
+                println!("Open paper fills: {}", summary.open_paper_fills);
+                println!("Closed paper fills: {}", summary.closed_paper_fills);
+                println!("Open notional USDC: {}", summary.open_notional_usdc);
+                println!("Realized PnL USDC: {}", summary.realized_pnl_usdc);
+            })
+        }
+        Command::Logs(args) => {
+            let cfg = config::load_or_default(&config_path)?;
+            let storage = Storage::open(&db_path(db_override.as_ref(), &cfg))?;
+            let rows = storage.recent_logs(args.limit)?;
+            print_response(json, &rows, || {
+                if rows.is_empty() {
+                    println!("No observed trades yet.");
+                    return;
+                }
+                for row in &rows {
+                    println!(
+                        "{} {} source={} status={} at={}",
+                        row.leader_address, row.trade_id, row.source, row.status, row.observed_at
+                    );
+                }
+            })
         }
     }
 }
@@ -300,6 +367,75 @@ fn doctor_warnings(cfg: &AppConfig) -> Vec<String> {
     warnings
 }
 
+async fn run_once(
+    cfg: &AppConfig,
+    storage: &mut Storage,
+    mode: ExecutionMode,
+    limit: usize,
+) -> Result<RunStats> {
+    if cfg.global.kill_switch {
+        anyhow::bail!("global kill switch is enabled");
+    }
+
+    let poller = ActivityPoller::new(&cfg.global.data_api_base_url);
+    let mut stats = RunStats::default();
+    for leader in cfg.leaders.iter().filter(|leader| leader.enabled) {
+        let trades = poller
+            .fetch_trades(leader, limit)
+            .await
+            .with_context(|| format!("failed to poll leader {}", leader.address))?;
+        stats.fetched_trades += trades.len();
+        for trade in trades {
+            if storage.has_processed_trade(&trade.leader_address, &trade.trade_id)? {
+                continue;
+            }
+            let risk_context = RiskContext {
+                leader_daily_notional_usdc: storage.leader_daily_notional(&leader.address)?,
+                market_open_notional_usdc: storage
+                    .leader_market_open_notional(&leader.address, trade.condition_id.as_deref())?,
+            };
+            let intent = build_intent(mode, leader, &trade, risk_context);
+            let inserted = storage.insert_processed_trade(&trade, "observed")?;
+            if !inserted {
+                continue;
+            }
+            stats.new_trades += 1;
+            storage.insert_copy_intent(&intent)?;
+            if let Some(fill) = paper_fill_for(&intent) {
+                storage.insert_paper_fill(&fill)?;
+                stats.paper_fills += 1;
+            } else {
+                stats.blocked_intents += 1;
+            }
+        }
+    }
+    Ok(stats)
+}
+
+async fn run_loop(
+    cfg: &AppConfig,
+    storage: &mut Storage,
+    mode: ExecutionMode,
+    limit: usize,
+) -> Result<RunStats> {
+    let mut total = RunStats::default();
+    loop {
+        let stats = run_once(cfg, storage, mode, limit).await?;
+        total.fetched_trades += stats.fetched_trades;
+        total.new_trades += stats.new_trades;
+        total.blocked_intents += stats.blocked_intents;
+        total.paper_fills += stats.paper_fills;
+        println!(
+            "cycle: fetched={}, new={}, paper={}, blocked={}",
+            stats.fetched_trades, stats.new_trades, stats.paper_fills, stats.blocked_intents
+        );
+        tokio::time::sleep(std::time::Duration::from_secs(
+            cfg.global.poll_interval_secs,
+        ))
+        .await;
+    }
+}
+
 fn config_path(cli: &Cli) -> Result<PathBuf> {
     match &cli.config {
         Some(path) => Ok(path.clone()),
@@ -365,5 +501,17 @@ struct RunResponse {
     mode: ExecutionMode,
     once: bool,
     enabled_leaders: usize,
+    fetched_trades: usize,
+    new_trades: usize,
+    blocked_intents: usize,
+    paper_fills: usize,
     message: String,
+}
+
+#[derive(Debug, Default)]
+struct RunStats {
+    fetched_trades: usize,
+    new_trades: usize,
+    blocked_intents: usize,
+    paper_fills: usize,
 }

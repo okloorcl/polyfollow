@@ -38,12 +38,14 @@ leader sources
       `orders`, `pnl`, `logs`, `doctor`, `config show`.
 - [x] SQLite storage for leaders, processed trades, intents, paper fills, live
       order attempts, and risk state.
-- [ ] Polymarket Data API activity polling for multiple leaders.
-- [ ] Trade normalization and dedupe.
-- [ ] Per-leader sizing: `ratio` and `fixed`.
-- [ ] Risk engine: max order, max daily, max position, max latency, price drift,
-      min depth, max spread, buy/sell toggles, kill switch.
-- [ ] Paper executor and PnL/status reports.
+- [x] Polymarket Data API activity polling for multiple leaders.
+- [x] Trade normalization and dedupe.
+- [x] Per-leader sizing: `ratio` and `fixed`.
+- [ ] Risk engine.
+      - [x] max order, max daily, max position, max latency, buy/sell toggles,
+            market allow/block filters, kill switch.
+      - [ ] price drift, min depth, max spread after CLOB order-book enrichment.
+- [x] Paper executor and PnL/status reports.
 - [ ] Live executor skeleton using the same intent contract, blocked unless
       explicitly confirmed.
 - [ ] README with simple “download and run” style usage.
