@@ -66,13 +66,16 @@ show realized PnL instead of only open notional.
 ## Design
 
 ```text
-Polymarket Data API
-  -> leader activity poller
-  -> normalized trade events
-  -> SQLite dedupe
-  -> sizing + risk engine
-  -> paper/live executor
-  -> audit log + reports
+src/app/          command orchestration and follow loop
+src/cli.rs        clap command definitions
+src/config.rs     TOML config model and validation
+src/engine.rs     sizing and risk decisions
+src/execution.rs  paper/live execution adapters
+src/market.rs     CLOB order-book enrichment
+src/monitor.rs    Polymarket Data API trade polling
+src/storage.rs    SQLite audit and paper ledger
+src/server.rs     local read-only HTTP API
+src/watch.rs      CLOB websocket watcher
 ```
 
 See [PLAN.md](PLAN.md) for the implementation roadmap.
