@@ -73,7 +73,7 @@ src/engine.rs     sizing and risk decisions
 src/execution.rs  paper/live execution adapters
 src/market.rs     CLOB order-book enrichment
 src/monitor.rs    Polymarket Data API trade polling
-src/storage.rs    SQLite audit and paper ledger
+src/storage/      SQLite schema, audit rows, and paper ledger
 src/server.rs     local read-only HTTP API
 src/watch.rs      CLOB websocket watcher
 ```
