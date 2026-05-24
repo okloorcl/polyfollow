@@ -1,3 +1,4 @@
+mod allocation;
 mod app;
 mod backtest;
 mod chain;

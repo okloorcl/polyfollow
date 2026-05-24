@@ -67,7 +67,7 @@ leader sources
 - [x] Static local HTML dashboard from SQLite state.
 - [x] Offline backtesting for normalized leader trade JSON.
 - [ ] Automatic leader cooldown/demotion.
-- [ ] Portfolio-level allocation optimizer.
+- [x] Portfolio-level allocation optimizer with optional config apply.
 - [ ] MarketBridge realtime enrichment.
 
 ## References Studied

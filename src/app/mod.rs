@@ -1,10 +1,12 @@
 use anyhow::Result;
+use rust_decimal::Decimal;
 
 mod follow;
 mod leaders;
 mod responses;
 mod support;
 
+use crate::allocation;
 use crate::backtest;
 use crate::chain;
 use crate::cli::{Cli, Command, ConfigCommand};
@@ -244,6 +246,36 @@ pub async fn run(cli: Cli) -> Result<()> {
                 );
                 println!("Open notional USDC: {}", report.open_notional_usdc);
                 println!("Realized PnL USDC: {}", report.realized_pnl_usdc);
+            })
+        }
+        Command::Allocate(args) => {
+            let mut cfg = config::load_or_default(&config_path)?;
+            let capital = match args.capital {
+                Some(value) => value.parse::<Decimal>()?,
+                None => cfg.account.max_capital_usdc,
+            };
+            let order_fraction = args.order_fraction.parse::<Decimal>()?;
+            let daily_fraction = args.daily_fraction.parse::<Decimal>()?;
+            let plan =
+                allocation::build_allocation_plan(&cfg, capital, order_fraction, daily_fraction)?;
+            if args.apply {
+                allocation::apply_allocation_plan(&mut cfg, &plan);
+                config::save(&config_path, &cfg)?;
+            }
+            print_response(json, &plan, || {
+                println!(
+                    "Allocation: capital={} enabled_leaders={}",
+                    plan.capital_usdc, plan.enabled_leaders
+                );
+                for row in &plan.rows {
+                    println!(
+                        "{} budget={} max_order={} max_daily={}",
+                        row.leader_address,
+                        row.budget_usdc,
+                        row.suggested_max_order_usdc,
+                        row.suggested_max_daily_usdc
+                    );
+                }
             })
         }
     }

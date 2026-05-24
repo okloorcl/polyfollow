@@ -61,6 +61,8 @@ pub enum Command {
     Dashboard(DashboardArgs),
     /// Replay normalized LeaderTrade JSON through paper execution.
     Backtest(BacktestArgs),
+    /// Suggest or apply portfolio-level leader risk allocations.
+    Allocate(AllocateArgs),
 }
 
 #[derive(Debug, Args)]
@@ -327,6 +329,25 @@ pub struct BacktestArgs {
     /// Leader wallet to backtest. Must exist in config.
     #[arg(long)]
     pub leader: String,
+}
+
+#[derive(Debug, Args)]
+pub struct AllocateArgs {
+    /// Override account capital. Defaults to config.account.max_capital_usdc.
+    #[arg(long)]
+    pub capital: Option<String>,
+
+    /// Max order as a fraction of each leader budget.
+    #[arg(long, default_value = "0.02")]
+    pub order_fraction: String,
+
+    /// Max daily notional as a fraction of each leader budget.
+    #[arg(long, default_value = "0.10")]
+    pub daily_fraction: String,
+
+    /// Write suggested caps back to config.
+    #[arg(long)]
+    pub apply: bool,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
