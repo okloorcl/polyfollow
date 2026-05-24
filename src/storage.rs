@@ -260,6 +260,32 @@ impl Storage {
         Ok(())
     }
 
+    pub fn insert_live_attempt(
+        &self,
+        intent_id: &str,
+        status: &str,
+        request: &serde_json::Value,
+        response: Option<&serde_json::Value>,
+    ) -> Result<()> {
+        let attempt_id = format!("live:{intent_id}:{}", chrono::Utc::now().timestamp_millis());
+        self.conn.execute(
+            r#"
+            INSERT INTO live_order_attempts (
+                attempt_id, intent_id, status, request_json, response_json, created_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, datetime('now'))
+            "#,
+            params![
+                attempt_id,
+                intent_id,
+                status,
+                serde_json::to_string(request)?,
+                response.map(serde_json::to_string).transpose()?,
+            ],
+        )?;
+        Ok(())
+    }
+
     pub fn recent_intents(&self, limit: usize) -> Result<Vec<IntentRow>> {
         let mut stmt = self.conn.prepare(
             r#"
@@ -387,6 +413,7 @@ impl Storage {
 fn verdict_label(verdict: IntentVerdict) -> &'static str {
     match verdict {
         IntentVerdict::Paper => "paper",
+        IntentVerdict::Live => "live",
         IntentVerdict::Blocked => "blocked",
     }
 }

@@ -61,6 +61,7 @@ pub struct CopyIntent {
 #[serde(rename_all = "snake_case")]
 pub enum IntentVerdict {
     Paper,
+    Live,
     Blocked,
 }
 

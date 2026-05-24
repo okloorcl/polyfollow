@@ -121,16 +121,11 @@ pub fn build_intent(
     let verdict = if reasons.is_empty() {
         match mode {
             ExecutionMode::Paper => IntentVerdict::Paper,
-            ExecutionMode::Live => IntentVerdict::Blocked,
+            ExecutionMode::Live => IntentVerdict::Live,
         }
     } else {
         IntentVerdict::Blocked
     };
-
-    let mut reasons = reasons;
-    if matches!(mode, ExecutionMode::Live) {
-        reasons.push("live execution is blocked until native executor lands".to_string());
-    }
 
     CopyIntent {
         intent_id: format!("intent:{}:{}", leader.address, trade.trade_id),

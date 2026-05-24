@@ -41,19 +41,19 @@ leader sources
 - [x] Polymarket Data API activity polling for multiple leaders.
 - [x] Trade normalization and dedupe.
 - [x] Per-leader sizing: `ratio` and `fixed`.
-- [ ] Risk engine.
+- [x] Risk engine.
       - [x] max order, max daily, max position, max latency, buy/sell toggles,
             market allow/block filters, kill switch.
       - [x] price drift, min depth, max spread with CLOB order-book enrichment
             when a token id is available.
 - [x] Paper executor and PnL/status reports.
-- [x] Live executor skeleton using the same intent contract, blocked unless
-      explicitly confirmed.
+- [x] Native live Polymarket CLOB market-order executor using the official Rust
+      SDK, environment private key, and explicit `--live --confirm-live`.
 - [x] README with simple “download and run” style usage.
 
 ## P1 Scope
 
-- [ ] Native live Polymarket CLOB order execution using the official Rust SDK.
+- [x] Native live Polymarket CLOB order execution using the official Rust SDK.
 - [ ] CLOB websocket or activity websocket monitor.
 - [ ] On-chain websocket backup monitor.
 - [ ] FIFO sell matching.

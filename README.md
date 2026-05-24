@@ -8,8 +8,10 @@ default. Live trading is opt-in and requires explicit confirmation.
 
 ## Current Status
 
-This project is under active implementation. P0 focuses on a safe paper-trading
-closed loop before enabling real orders.
+This project is under active implementation. The safe paper-trading loop is
+usable now. Native live execution is wired through the official Polymarket Rust
+SDK, but it remains opt-in and guarded by explicit flags plus an environment
+private key.
 
 ## Intended Usage
 
@@ -35,13 +37,14 @@ polyfollow pnl
 Live trading will stay blocked unless invoked explicitly:
 
 ```bash
-polyfollow run --live --confirm-live
+export POLYFOLLOW_PRIVATE_KEY="0x..."
+polyfollow run --live --confirm-live --once
 ```
 
-Live execution is intentionally blocked in the current milestone. Paper mode
-already polls the Polymarket Data API, normalizes leader trades, deduplicates
-them, enriches with CLOB order-book checks when token ids are available, builds
-copy intents, and records paper fills.
+Paper mode polls the Polymarket Data API, normalizes leader trades,
+deduplicates them, enriches with CLOB order-book checks when token ids are
+available, builds copy intents, and records paper fills. Live mode submits
+market FAK orders to the Polymarket CLOB only after all risk checks pass.
 
 ## Design
 
@@ -63,6 +66,8 @@ PolyFollow uses one TOML config file plus one SQLite database:
 
 - Config: global mode and risk, account wallet, per-leader sizing/risk.
 - SQLite: observed trades, dedupe state, copy intents, paper fills, live attempts.
+- Live key: `POLYFOLLOW_PRIVATE_KEY` or `POLYMARKET_PRIVATE_KEY`. Keys are read
+  from the environment and are not written to the config or SQLite database.
 
 Default paths:
 
@@ -89,4 +94,20 @@ polyfollow --json run --paper --once --limit 50
 polyfollow --json orders
 polyfollow --json logs
 polyfollow --json status
+```
+
+## Live Safety
+
+Live trading requires all of these:
+
+```bash
+export POLYFOLLOW_PRIVATE_KEY="0x..."
+polyfollow run --live --confirm-live
+```
+
+Optional account signature type in `config.toml`:
+
+```toml
+[account]
+signature_type = "proxy" # proxy, eoa, or gnosis-safe
 ```

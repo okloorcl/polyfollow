@@ -50,6 +50,8 @@ pub struct AccountConfig {
     pub max_capital_usdc: Decimal,
     #[serde(default = "default_account_max_daily_loss")]
     pub max_daily_loss_usdc: Decimal,
+    #[serde(default = "default_signature_type")]
+    pub signature_type: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -154,6 +156,7 @@ impl Default for AccountConfig {
             wallet: None,
             max_capital_usdc: default_max_capital(),
             max_daily_loss_usdc: default_account_max_daily_loss(),
+            signature_type: default_signature_type(),
         }
     }
 }
@@ -330,6 +333,10 @@ fn default_max_capital() -> Decimal {
 
 fn default_account_max_daily_loss() -> Decimal {
     dec!(50)
+}
+
+fn default_signature_type() -> String {
+    "proxy".to_string()
 }
 
 fn default_true() -> bool {

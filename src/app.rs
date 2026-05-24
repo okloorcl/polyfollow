@@ -11,7 +11,7 @@ use crate::config::{
     self, AppConfig, CopyConfig, CopyMode, ExecutionMode, LeaderConfig, LeaderRiskConfig,
 };
 use crate::engine::{RiskContext, build_intent};
-use crate::execution::paper_fill_for;
+use crate::execution::{LiveExecutionConfig, execute_live_market_order, paper_fill_for};
 use crate::market::OrderBookClient;
 use crate::monitor::ActivityPoller;
 use crate::output::print_json;
@@ -126,15 +126,17 @@ pub async fn run(cli: Cli) -> Result<()> {
             if matches!(mode, ExecutionMode::Live) && !args.confirm_live {
                 anyhow::bail!("live mode requires --confirm-live");
             }
-            if matches!(mode, ExecutionMode::Live) {
-                anyhow::bail!("live execution is not implemented yet; paper mode is available");
-            }
+            let live_config = if matches!(mode, ExecutionMode::Live) {
+                Some(LiveExecutionConfig::from_env(&cfg.account)?)
+            } else {
+                None
+            };
             let mut storage = Storage::open(&db_path(db_override.as_ref(), &cfg))?;
             storage.sync_leaders(&cfg.leaders)?;
             let run_stats = if args.once {
-                run_once(&cfg, &mut storage, mode, args.limit).await?
+                run_once(&cfg, &mut storage, mode, args.limit, live_config.as_ref()).await?
             } else {
-                run_loop(&cfg, &mut storage, mode, args.limit).await?
+                run_loop(&cfg, &mut storage, mode, args.limit, live_config.as_ref()).await?
             };
             let response = RunResponse {
                 mode,
@@ -373,6 +375,7 @@ async fn run_once(
     storage: &mut Storage,
     mode: ExecutionMode,
     limit: usize,
+    live_config: Option<&LiveExecutionConfig>,
 ) -> Result<RunStats> {
     if cfg.global.kill_switch {
         anyhow::bail!("global kill switch is enabled");
@@ -421,6 +424,32 @@ async fn run_once(
             if let Some(fill) = paper_fill_for(&intent) {
                 storage.insert_paper_fill(&fill)?;
                 stats.paper_fills += 1;
+            } else if intent.verdict == crate::types::IntentVerdict::Live {
+                let request = serde_json::to_value(&intent)?;
+                match execute_live_market_order(
+                    live_config.ok_or_else(|| anyhow::anyhow!("missing live config"))?,
+                    &intent,
+                )
+                .await
+                {
+                    Ok(response) => {
+                        storage.insert_live_attempt(
+                            &intent.intent_id,
+                            "submitted",
+                            &request,
+                            Some(&response),
+                        )?;
+                    }
+                    Err(error) => {
+                        storage.insert_live_attempt(
+                            &intent.intent_id,
+                            "failed",
+                            &request,
+                            Some(&serde_json::json!({"error": error.to_string()})),
+                        )?;
+                        return Err(error);
+                    }
+                }
             } else {
                 stats.blocked_intents += 1;
             }
@@ -434,10 +463,11 @@ async fn run_loop(
     storage: &mut Storage,
     mode: ExecutionMode,
     limit: usize,
+    live_config: Option<&LiveExecutionConfig>,
 ) -> Result<RunStats> {
     let mut total = RunStats::default();
     loop {
-        let stats = run_once(cfg, storage, mode, limit).await?;
+        let stats = run_once(cfg, storage, mode, limit, live_config).await?;
         total.fetched_trades += stats.fetched_trades;
         total.new_trades += stats.new_trades;
         total.blocked_intents += stats.blocked_intents;
