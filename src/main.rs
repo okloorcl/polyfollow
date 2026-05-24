@@ -1,4 +1,5 @@
 mod app;
+mod chain;
 mod cli;
 mod config;
 mod engine;

@@ -55,6 +55,8 @@ pub enum Command {
     Serve(ServeArgs),
     /// Watch Polymarket CLOB market websocket events for token ids.
     WatchClob(WatchClobArgs),
+    /// Poll Polygon logs as an on-chain backup feed.
+    WatchChain(WatchChainArgs),
 }
 
 #[derive(Debug, Args)]
@@ -267,6 +269,37 @@ pub struct WatchClobArgs {
     pub ping_secs: u64,
 
     /// Exit after first event payload.
+    #[arg(long)]
+    pub once: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct WatchChainArgs {
+    /// Polygon JSON-RPC URL.
+    #[arg(long)]
+    pub rpc_url: String,
+
+    /// Contract address to monitor. Repeatable.
+    #[arg(long = "contract")]
+    pub contracts: Vec<String>,
+
+    /// Topic0 to monitor. Repeatable. Defaults to Polymarket OrderFilled topics.
+    #[arg(long = "topic")]
+    pub topics: Vec<String>,
+
+    /// Start block. Defaults to latest block.
+    #[arg(long)]
+    pub from_block: Option<u64>,
+
+    /// Max blocks per eth_getLogs request.
+    #[arg(long, default_value_t = 1000)]
+    pub batch_blocks: u64,
+
+    /// Poll interval for continuous mode.
+    #[arg(long, default_value_t = 5)]
+    pub poll_secs: u64,
+
+    /// Run one polling cycle and exit.
     #[arg(long)]
     pub once: bool,
 }

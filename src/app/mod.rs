@@ -5,6 +5,7 @@ mod leaders;
 mod responses;
 mod support;
 
+use crate::chain;
 use crate::cli::{Cli, Command, ConfigCommand};
 use crate::config::{self, AppConfig, ExecutionMode};
 use crate::execution::LiveExecutionConfig;
@@ -222,5 +223,6 @@ pub async fn run(cli: Cli) -> Result<()> {
             server::serve(cfg, db_path, &args.addr).await
         }
         Command::WatchClob(args) => watch::watch_clob(args, json).await,
+        Command::WatchChain(args) => chain::watch_chain(args, json).await,
     }
 }

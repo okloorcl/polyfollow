@@ -139,6 +139,19 @@ polyfollow watch-clob --asset 123456789 --once --json
 polyfollow watch-clob --assets-file token_ids.txt
 ```
 
+## On-Chain Backup Watcher
+
+When you want a raw backup feed from Polygon itself, poll OrderFilled logs from
+the Polymarket exchange contract:
+
+```bash
+polyfollow --json watch-chain \
+  --rpc-url https://polygon-rpc.com \
+  --contract 0x... \
+  --from-block 72100000 \
+  --once
+```
+
 ## Live Safety
 
 Live trading requires all of these:
