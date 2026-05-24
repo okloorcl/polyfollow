@@ -5,6 +5,7 @@ mod leaders;
 mod responses;
 mod support;
 
+use crate::backtest;
 use crate::chain;
 use crate::cli::{Cli, Command, ConfigCommand};
 use crate::config::{self, AppConfig, ExecutionMode};
@@ -231,6 +232,18 @@ pub async fn run(cli: Cli) -> Result<()> {
             dashboard::render_dashboard(&cfg, &storage, &args.out, args.limit)?;
             print_response(json, &serde_json::json!({ "out": args.out }), || {
                 println!("Dashboard: {}", args.out.display());
+            })
+        }
+        Command::Backtest(args) => {
+            let cfg = config::load_or_default(&config_path)?;
+            let report = backtest::run_backtest(&cfg, &args.leader, &args.input)?;
+            print_response(json, &report, || {
+                println!(
+                    "Backtest: leader={} trades={} intents={} fills={} blocked={}",
+                    report.leader, report.trades, report.intents, report.fills, report.blocked
+                );
+                println!("Open notional USDC: {}", report.open_notional_usdc);
+                println!("Realized PnL USDC: {}", report.realized_pnl_usdc);
             })
         }
     }

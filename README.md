@@ -136,6 +136,13 @@ Render a static dashboard without running a server:
 polyfollow dashboard --out polyfollow-dashboard.html --limit 50
 ```
 
+Replay normalized `LeaderTrade[]` JSON through the paper engine:
+
+```bash
+polyfollow --json backtest trades.json \
+  --leader 0x2222222222222222222222222222222222222222
+```
+
 ## CLOB Websocket Watcher
 
 Watch live order-book events for one or more Polymarket token ids:

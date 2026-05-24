@@ -59,6 +59,8 @@ pub enum Command {
     WatchChain(WatchChainArgs),
     /// Render a static local HTML dashboard from SQLite.
     Dashboard(DashboardArgs),
+    /// Replay normalized LeaderTrade JSON through paper execution.
+    Backtest(BacktestArgs),
 }
 
 #[derive(Debug, Args)]
@@ -315,6 +317,16 @@ pub struct DashboardArgs {
     /// Number of recent orders/logs to include.
     #[arg(long, default_value_t = 30)]
     pub limit: usize,
+}
+
+#[derive(Debug, Args)]
+pub struct BacktestArgs {
+    /// JSON file containing an array of normalized LeaderTrade records.
+    pub input: PathBuf,
+
+    /// Leader wallet to backtest. Must exist in config.
+    #[arg(long)]
+    pub leader: String,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]

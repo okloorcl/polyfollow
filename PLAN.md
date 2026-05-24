@@ -65,7 +65,7 @@ leader sources
 ## P2 Scope
 
 - [x] Static local HTML dashboard from SQLite state.
-- [ ] Backtesting for leader follow configs.
+- [x] Offline backtesting for normalized leader trade JSON.
 - [ ] Automatic leader cooldown/demotion.
 - [ ] Portfolio-level allocation optimizer.
 - [ ] MarketBridge realtime enrichment.

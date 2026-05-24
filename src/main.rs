@@ -1,4 +1,5 @@
 mod app;
+mod backtest;
 mod chain;
 mod cli;
 mod config;
