@@ -64,7 +64,7 @@ leader sources
 
 ## P2 Scope
 
-- [ ] Local dashboard.
+- [x] Static local HTML dashboard from SQLite state.
 - [ ] Backtesting for leader follow configs.
 - [ ] Automatic leader cooldown/demotion.
 - [ ] Portfolio-level allocation optimizer.

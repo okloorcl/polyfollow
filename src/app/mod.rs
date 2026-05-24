@@ -8,6 +8,7 @@ mod support;
 use crate::chain;
 use crate::cli::{Cli, Command, ConfigCommand};
 use crate::config::{self, AppConfig, ExecutionMode};
+use crate::dashboard;
 use crate::execution::LiveExecutionConfig;
 use crate::output::print_json;
 use crate::server;
@@ -224,5 +225,13 @@ pub async fn run(cli: Cli) -> Result<()> {
         }
         Command::WatchClob(args) => watch::watch_clob(args, json).await,
         Command::WatchChain(args) => chain::watch_chain(args, json).await,
+        Command::Dashboard(args) => {
+            let cfg = config::load_or_default(&config_path)?;
+            let storage = Storage::open(&db_path(db_override.as_ref(), &cfg))?;
+            dashboard::render_dashboard(&cfg, &storage, &args.out, args.limit)?;
+            print_response(json, &serde_json::json!({ "out": args.out }), || {
+                println!("Dashboard: {}", args.out.display());
+            })
+        }
     }
 }

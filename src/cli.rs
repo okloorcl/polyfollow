@@ -57,6 +57,8 @@ pub enum Command {
     WatchClob(WatchClobArgs),
     /// Poll Polygon logs as an on-chain backup feed.
     WatchChain(WatchChainArgs),
+    /// Render a static local HTML dashboard from SQLite.
+    Dashboard(DashboardArgs),
 }
 
 #[derive(Debug, Args)]
@@ -302,6 +304,17 @@ pub struct WatchChainArgs {
     /// Run one polling cycle and exit.
     #[arg(long)]
     pub once: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct DashboardArgs {
+    /// Output HTML file.
+    #[arg(long, default_value = "polyfollow-dashboard.html")]
+    pub out: PathBuf,
+
+    /// Number of recent orders/logs to include.
+    #[arg(long, default_value_t = 30)]
+    pub limit: usize,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]

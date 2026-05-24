@@ -2,6 +2,7 @@ mod app;
 mod chain;
 mod cli;
 mod config;
+mod dashboard;
 mod engine;
 mod execution;
 mod market;

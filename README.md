@@ -130,6 +130,12 @@ curl 'http://127.0.0.1:8787/logs?limit=20'
 curl http://127.0.0.1:8787/pnl
 ```
 
+Render a static dashboard without running a server:
+
+```bash
+polyfollow dashboard --out polyfollow-dashboard.html --limit 50
+```
+
 ## CLOB Websocket Watcher
 
 Watch live order-book events for one or more Polymarket token ids:
