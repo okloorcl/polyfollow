@@ -5,7 +5,8 @@ use rust_decimal::Decimal;
 use serde::Serialize;
 
 use crate::cli::{
-    Cli, Command, ConfigCommand, LeaderAddArgs, LeaderCommand, LeaderUpdateArgs, RunMode,
+    Cli, Command, ConfigCommand, LeaderAddArgs, LeaderCommand, LeaderUpdateArgs,
+    PolyAlphaImportArgs, RunMode,
 };
 use crate::config::{
     self, AppConfig, CopyConfig, CopyMode, ExecutionMode, LeaderConfig, LeaderRiskConfig,
@@ -16,6 +17,7 @@ use crate::market::OrderBookClient;
 use crate::monitor::ActivityPoller;
 use crate::notify::Notifier;
 use crate::output::print_json;
+use crate::polyalpha::{PolyAlphaCandidate, load_candidates};
 use crate::server;
 use crate::storage::Storage;
 use crate::validate::normalize_address;
@@ -248,6 +250,79 @@ fn handle_leader(json: bool, path: PathBuf, command: LeaderCommand) -> Result<()
                 println!("Updated leader {}", leader.address);
             })
         }
+        LeaderCommand::ImportPolyalpha(args) => import_polyalpha(json, path, &mut cfg, args),
+    }
+}
+
+fn import_polyalpha(
+    json: bool,
+    path: PathBuf,
+    cfg: &mut AppConfig,
+    args: PolyAlphaImportArgs,
+) -> Result<()> {
+    let min_score = parse_decimal(&args.min_score, "min-score")?;
+    let copy_ratio = parse_decimal(&args.copy_ratio, "copy-ratio")?;
+    let max_order = parse_decimal(&args.max_order, "max-order")?;
+    let max_daily = parse_decimal(&args.max_daily, "max-daily")?;
+    let candidates = load_candidates(&args.input, min_score, &args.verdict)?;
+    let mut imported = Vec::new();
+    let mut skipped_existing = 0usize;
+
+    if !args.dry_run {
+        for candidate in &candidates {
+            if cfg
+                .leaders
+                .iter()
+                .any(|leader| leader.address.eq_ignore_ascii_case(&candidate.address))
+            {
+                skipped_existing += 1;
+                continue;
+            }
+            let leader = leader_from_candidate(candidate, copy_ratio, max_order, max_daily);
+            cfg.add_leader(leader)?;
+            imported.push(candidate.clone());
+        }
+        config::save(&path, cfg)?;
+    }
+
+    let response = PolyAlphaImportResponse {
+        dry_run: args.dry_run,
+        candidates,
+        imported,
+        skipped_existing,
+    };
+    print_response(json, &response, || {
+        println!("PolyAlpha candidates: {}", response.candidates.len());
+        if response.dry_run {
+            println!("Dry run: config was not changed.");
+        } else {
+            println!("Imported leaders: {}", response.imported.len());
+            println!("Skipped existing: {}", response.skipped_existing);
+        }
+    })
+}
+
+fn leader_from_candidate(
+    candidate: &PolyAlphaCandidate,
+    copy_ratio: Decimal,
+    max_order: Decimal,
+    max_daily: Decimal,
+) -> LeaderConfig {
+    LeaderConfig {
+        address: candidate.address.clone(),
+        label: Some(candidate.label.clone()),
+        enabled: true,
+        copy: CopyConfig {
+            mode: CopyMode::Ratio,
+            ratio: copy_ratio,
+            fixed_order_usdc: CopyConfig::default().fixed_order_usdc,
+        },
+        risk: LeaderRiskConfig {
+            max_order_usdc: max_order,
+            max_daily_usdc: max_daily,
+            ..LeaderRiskConfig::default()
+        },
+        filters: Default::default(),
     }
 }
 
@@ -560,6 +635,14 @@ struct StatusResponse {
 struct DoctorResponse {
     ok: bool,
     warnings: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct PolyAlphaImportResponse {
+    dry_run: bool,
+    candidates: Vec<PolyAlphaCandidate>,
+    imported: Vec<PolyAlphaCandidate>,
+    skipped_existing: usize,
 }
 
 #[derive(Debug, Serialize)]

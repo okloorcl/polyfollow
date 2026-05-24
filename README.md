@@ -34,6 +34,20 @@ polyfollow status
 polyfollow pnl
 ```
 
+Import leader candidates from PolyAlpha:
+
+```bash
+polyfollow leader import-polyalpha /path/to/polyalpha/data/oktrader.sqlite \
+  --min-score 0.80 \
+  --copy-ratio 0.05 \
+  --max-order 15 \
+  --max-daily 75 \
+  --dry-run
+```
+
+Supported PolyAlpha inputs are JSON exports with wallet/account fields or a
+SQLite database containing `wallet_follow_scores`.
+
 Live trading will stay blocked unless invoked explicitly:
 
 ```bash

@@ -84,6 +84,8 @@ pub enum LeaderCommand {
     Remove(LeaderAddressArg),
     /// Update risk controls for a leader wallet.
     Update(LeaderUpdateArgs),
+    /// Import follow candidates exported by PolyAlpha.
+    ImportPolyalpha(PolyAlphaImportArgs),
 }
 
 #[derive(Debug, Args)]
@@ -158,6 +160,36 @@ pub struct LeaderUpdateArgs {
 
     #[arg(long)]
     pub support_sell: Option<bool>,
+}
+
+#[derive(Debug, Args)]
+pub struct PolyAlphaImportArgs {
+    /// PolyAlpha JSON export or SQLite database path.
+    pub input: PathBuf,
+
+    /// Minimum score required for import.
+    #[arg(long, default_value = "0.70")]
+    pub min_score: String,
+
+    /// Accepted verdict. Repeatable. Defaults to follow-like verdicts.
+    #[arg(long)]
+    pub verdict: Vec<String>,
+
+    /// Copy ratio assigned to imported leaders.
+    #[arg(long, default_value = "0.10")]
+    pub copy_ratio: String,
+
+    /// Per-order cap assigned to imported leaders.
+    #[arg(long, default_value = "20")]
+    pub max_order: String,
+
+    /// Per-day cap assigned to imported leaders.
+    #[arg(long, default_value = "100")]
+    pub max_daily: String,
+
+    /// Preview candidates without writing config.
+    #[arg(long)]
+    pub dry_run: bool,
 }
 
 #[derive(Debug, Args)]

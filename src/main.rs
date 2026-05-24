@@ -7,6 +7,7 @@ mod market;
 mod monitor;
 mod notify;
 mod output;
+mod polyalpha;
 mod server;
 mod storage;
 mod types;

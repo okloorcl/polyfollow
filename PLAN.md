@@ -59,7 +59,7 @@ leader sources
 - [x] FIFO sell matching for paper positions and realized PnL.
 - [ ] Multi-account allocation.
 - [x] Webhook/Telegram notifications for copy intents.
-- [ ] Import leader scores from PolyAlpha.
+- [x] Import leader scores from PolyAlpha JSON exports or SQLite.
 - [x] Local read-only HTTP API for status, leaders, orders, logs, and PnL.
 
 ## P2 Scope
