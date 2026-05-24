@@ -33,10 +33,10 @@ leader sources
 ## P0 Scope
 
 - [x] Project scaffold and product plan.
-- [ ] TOML configuration with global, account, and per-leader controls.
-- [ ] CLI commands: `setup`, `leader add/list/remove/update`, `run`, `status`,
+- [x] TOML configuration with global, account, and per-leader controls.
+- [x] CLI commands: `setup`, `leader add/list/remove/update`, `run`, `status`,
       `orders`, `pnl`, `logs`, `doctor`, `config show`.
-- [ ] SQLite storage for leaders, processed trades, intents, paper fills, live
+- [x] SQLite storage for leaders, processed trades, intents, paper fills, live
       order attempts, and risk state.
 - [ ] Polymarket Data API activity polling for multiple leaders.
 - [ ] Trade normalization and dedupe.
@@ -75,4 +75,3 @@ leader sources
   for a single-binary CLI.
 - `polymarket-cli`: official Rust CLI and best reference for wallet config, CLOB
   signing, orders, balances, spreads, books, and cancellations.
-

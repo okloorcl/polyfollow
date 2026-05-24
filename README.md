@@ -15,8 +15,18 @@ closed loop before enabling real orders.
 
 ```bash
 polyfollow setup
-polyfollow leader add 0xabc... --label "weather specialist" --copy-ratio 0.10 --max-order 20
-polyfollow leader add 0xdef... --label "small fixed" --fixed-order 10 --no-sell
+polyfollow leader add 0xabc... \
+  --label "weather specialist" \
+  --copy-ratio 0.10 \
+  --max-order 20 \
+  --max-daily 100
+
+polyfollow leader add 0xdef... \
+  --label "small fixed" \
+  --fixed-order 10 \
+  --no-sell
+
+polyfollow leader list
 polyfollow run --paper
 polyfollow status
 polyfollow pnl
@@ -42,3 +52,33 @@ Polymarket Data API
 
 See [PLAN.md](PLAN.md) for the implementation roadmap.
 
+## Configuration Model
+
+PolyFollow uses one TOML config file plus one SQLite database:
+
+- Config: global mode and risk, account wallet, per-leader sizing/risk.
+- SQLite: observed trades, dedupe state, copy intents, paper fills, live attempts.
+
+Default paths:
+
+```bash
+polyfollow config path
+```
+
+Example leader controls:
+
+```bash
+polyfollow leader add 0x2222222222222222222222222222222222222222 \
+  --label smart1 \
+  --copy-ratio 0.2 \
+  --max-order 25 \
+  --max-daily 100 \
+  --no-sell
+```
+
+Human output is the default. Add `--json` for agents:
+
+```bash
+polyfollow --json leader list
+polyfollow --json status
+```
