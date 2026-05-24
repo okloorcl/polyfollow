@@ -12,6 +12,7 @@ use crate::config::{
 };
 use crate::engine::{RiskContext, build_intent};
 use crate::execution::paper_fill_for;
+use crate::market::OrderBookClient;
 use crate::monitor::ActivityPoller;
 use crate::output::print_json;
 use crate::storage::Storage;
@@ -378,6 +379,7 @@ async fn run_once(
     }
 
     let poller = ActivityPoller::new(&cfg.global.data_api_base_url);
+    let order_books = OrderBookClient::new(&cfg.global.clob_base_url);
     let mut stats = RunStats::default();
     for leader in cfg.leaders.iter().filter(|leader| leader.enabled) {
         let trades = poller
@@ -389,11 +391,26 @@ async fn run_once(
             if storage.has_processed_trade(&trade.leader_address, &trade.trade_id)? {
                 continue;
             }
-            let risk_context = RiskContext {
+            let mut risk_context = RiskContext {
                 leader_daily_notional_usdc: storage.leader_daily_notional(&leader.address)?,
                 market_open_notional_usdc: storage
                     .leader_market_open_notional(&leader.address, trade.condition_id.as_deref())?,
+                book: None,
+                book_error: None,
             };
+            if let Some(token_id) = trade.token_id.as_deref() {
+                let preview_intent = build_intent(mode, leader, &trade, RiskContext::default());
+                match order_books
+                    .metrics_for(token_id, trade.side, preview_intent.notional_usdc)
+                    .await
+                {
+                    Ok(book) => risk_context.book = Some(book),
+                    Err(error) => {
+                        tracing::warn!(%token_id, error = %error, "failed to fetch order book");
+                        risk_context.book_error = Some("order book unavailable");
+                    }
+                }
+            }
             let intent = build_intent(mode, leader, &trade, risk_context);
             let inserted = storage.insert_processed_trade(&trade, "observed")?;
             if !inserted {

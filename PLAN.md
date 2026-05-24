@@ -44,11 +44,12 @@ leader sources
 - [ ] Risk engine.
       - [x] max order, max daily, max position, max latency, buy/sell toggles,
             market allow/block filters, kill switch.
-      - [ ] price drift, min depth, max spread after CLOB order-book enrichment.
+      - [x] price drift, min depth, max spread with CLOB order-book enrichment
+            when a token id is available.
 - [x] Paper executor and PnL/status reports.
-- [ ] Live executor skeleton using the same intent contract, blocked unless
+- [x] Live executor skeleton using the same intent contract, blocked unless
       explicitly confirmed.
-- [ ] README with simple “download and run” style usage.
+- [x] README with simple “download and run” style usage.
 
 ## P1 Scope
 

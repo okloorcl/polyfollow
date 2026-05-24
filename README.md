@@ -40,7 +40,8 @@ polyfollow run --live --confirm-live
 
 Live execution is intentionally blocked in the current milestone. Paper mode
 already polls the Polymarket Data API, normalizes leader trades, deduplicates
-them, builds copy intents, and records paper fills.
+them, enriches with CLOB order-book checks when token ids are available, builds
+copy intents, and records paper fills.
 
 ## Design
 

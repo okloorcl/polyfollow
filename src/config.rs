@@ -28,6 +28,8 @@ pub struct GlobalConfig {
     pub db_path: PathBuf,
     #[serde(default = "default_data_api_base_url")]
     pub data_api_base_url: String,
+    #[serde(default = "default_clob_base_url")]
+    pub clob_base_url: String,
     #[serde(default = "default_poll_interval_secs")]
     pub poll_interval_secs: u64,
     #[serde(default = "default_max_daily_loss")]
@@ -136,6 +138,7 @@ impl Default for GlobalConfig {
             mode: default_mode(),
             db_path: default_db_path(),
             data_api_base_url: default_data_api_base_url(),
+            clob_base_url: default_clob_base_url(),
             poll_interval_secs: default_poll_interval_secs(),
             max_daily_loss_usdc: default_max_daily_loss(),
             max_open_positions: default_max_open_positions(),
@@ -299,6 +302,10 @@ fn default_db_path() -> PathBuf {
 
 fn default_data_api_base_url() -> String {
     "https://data-api.polymarket.com".to_string()
+}
+
+fn default_clob_base_url() -> String {
+    "https://clob.polymarket.com".to_string()
 }
 
 fn default_poll_interval_secs() -> u64 {

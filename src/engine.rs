@@ -2,12 +2,15 @@ use chrono::Utc;
 use rust_decimal::Decimal;
 
 use crate::config::{CopyMode, ExecutionMode, LeaderConfig};
+use crate::market::BookMetrics;
 use crate::types::{CopyIntent, IntentVerdict, LeaderTrade, TradeSide};
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct RiskContext {
     pub leader_daily_notional_usdc: Decimal,
     pub market_open_notional_usdc: Decimal,
+    pub book: Option<BookMetrics>,
+    pub book_error: Option<&'static str>,
 }
 
 pub fn build_intent(
@@ -59,6 +62,55 @@ pub fn build_intent(
     }
     if market_matches_any(trade, &leader.filters.block) {
         reasons.push("market is blocklisted".to_string());
+    }
+    if let Some(book_error) = risk_context.book_error {
+        reasons.push(book_error.to_string());
+    }
+    if let Some(book) = risk_context.book.as_ref() {
+        if let Some(spread_bps) = book.spread_bps
+            && spread_bps > leader.risk.max_spread_bps
+        {
+            reasons.push(format!(
+                "spread_bps {} exceeds max_spread_bps {}",
+                spread_bps, leader.risk.max_spread_bps
+            ));
+        }
+        if book.executable_depth_usdc < leader.risk.min_depth_usdc {
+            reasons.push(format!(
+                "executable_depth_usdc {} below min_depth_usdc {}",
+                book.executable_depth_usdc, leader.risk.min_depth_usdc
+            ));
+        }
+        if let Some(leader_price) = trade.price {
+            match trade.side {
+                TradeSide::Buy => {
+                    if let Some(best_ask) = book.best_ask {
+                        let max_price = leader_price
+                            * (Decimal::ONE
+                                + leader.risk.max_price_drift_bps / Decimal::from(10_000));
+                        if best_ask > max_price {
+                            reasons.push(format!(
+                                "best_ask {} exceeds drift-adjusted max {}",
+                                best_ask, max_price
+                            ));
+                        }
+                    }
+                }
+                TradeSide::Sell => {
+                    if let Some(best_bid) = book.best_bid {
+                        let min_price = leader_price
+                            * (Decimal::ONE
+                                - leader.risk.max_price_drift_bps / Decimal::from(10_000));
+                        if best_bid < min_price {
+                            reasons.push(format!(
+                                "best_bid {} below drift-adjusted min {}",
+                                best_bid, min_price
+                            ));
+                        }
+                    }
+                }
+            }
+        }
     }
 
     let shares = trade
