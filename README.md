@@ -157,6 +157,16 @@ polyfollow cooldown --blocked-threshold 5
 polyfollow cooldown --blocked-threshold 5 --apply
 ```
 
+Fetch live context from a local MarketBridge instance:
+
+```bash
+polyfollow --json marketbridge-context \
+  --base-url http://127.0.0.1:8080 \
+  --symbol BTCUSDT \
+  --symbol ETHUSDT \
+  --market perp
+```
+
 ## CLOB Websocket Watcher
 
 Watch live order-book events for one or more Polymarket token ids:

@@ -14,6 +14,7 @@ use crate::config::{self, AppConfig, ExecutionMode};
 use crate::cooldown;
 use crate::dashboard;
 use crate::execution::LiveExecutionConfig;
+use crate::marketbridge;
 use crate::output::print_json;
 use crate::server;
 use crate::storage::Storage;
@@ -299,6 +300,17 @@ pub async fn run(cli: Cli) -> Result<()> {
                         candidate.leader_address, candidate.blocked_intents, candidate.disabled
                     );
                 }
+            })
+        }
+        Command::MarketbridgeContext(args) => {
+            let value =
+                marketbridge::fetch_agent_context(&args.base_url, &args.symbols, &args.market)
+                    .await?;
+            print_response(json, &value, || {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&value).unwrap_or_default()
+                );
             })
         }
     }

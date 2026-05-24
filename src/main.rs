@@ -9,6 +9,7 @@ mod dashboard;
 mod engine;
 mod execution;
 mod market;
+mod marketbridge;
 mod monitor;
 mod notify;
 mod output;

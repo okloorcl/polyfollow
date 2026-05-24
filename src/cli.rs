@@ -65,6 +65,8 @@ pub enum Command {
     Allocate(AllocateArgs),
     /// Audit blocked leaders and optionally disable noisy leaders.
     Cooldown(CooldownArgs),
+    /// Fetch agent-friendly context from a local MarketBridge instance.
+    MarketbridgeContext(MarketBridgeContextArgs),
 }
 
 #[derive(Debug, Args)]
@@ -361,6 +363,21 @@ pub struct CooldownArgs {
     /// Write disabled leaders back to config.
     #[arg(long)]
     pub apply: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct MarketBridgeContextArgs {
+    /// MarketBridge base URL.
+    #[arg(long, default_value = "http://127.0.0.1:8080")]
+    pub base_url: String,
+
+    /// Symbol to request. Repeatable.
+    #[arg(long = "symbol")]
+    pub symbols: Vec<String>,
+
+    /// Product type / market parameter, e.g. spot or perp.
+    #[arg(long, default_value = "perp")]
+    pub market: String,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]

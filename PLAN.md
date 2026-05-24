@@ -68,7 +68,7 @@ leader sources
 - [x] Offline backtesting for normalized leader trade JSON.
 - [x] Leader cooldown audit with optional config demotion.
 - [x] Portfolio-level allocation optimizer with optional config apply.
-- [ ] MarketBridge realtime enrichment.
+- [x] MarketBridge agent context enrichment command.
 
 ## References Studied
 
