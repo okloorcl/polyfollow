@@ -1,6 +1,7 @@
 use anyhow::Result;
 use rust_decimal::Decimal;
 
+mod admin;
 mod follow;
 mod leaders;
 mod responses;
@@ -9,127 +10,32 @@ mod support;
 use crate::allocation;
 use crate::backtest;
 use crate::chain;
-use crate::cli::{Cli, Command, ConfigCommand};
-use crate::config::{self, AppConfig, ExecutionMode};
+use crate::cli::{Cli, Command};
+use crate::config::{self, ExecutionMode};
 use crate::cooldown;
 use crate::dashboard;
 use crate::execution::LiveExecutionConfig;
 use crate::marketbridge;
-use crate::output::print_json;
 use crate::server;
 use crate::storage::Storage;
-use crate::validate::normalize_address;
 use crate::watch;
 
+use self::admin::{handle_config, handle_doctor, handle_setup, handle_status};
 use self::follow::{run_loop, run_once};
 use self::leaders::handle_leader;
-use self::responses::{
-    ConfigPathResponse, DoctorResponse, RunResponse, SetupResponse, StatusResponse,
-};
-use self::support::{config_path, db_path, doctor_warnings, print_response, run_mode};
+use self::responses::RunResponse;
+use self::support::{config_path, db_path, print_response, run_mode};
 
 pub async fn run(cli: Cli) -> Result<()> {
     let config_path = config_path(&cli)?;
     let db_override = cli.db.clone();
     let json = cli.json;
     match cli.command {
-        Command::Setup(args) => {
-            let mut cfg = if args.force || !config_path.exists() {
-                AppConfig::default()
-            } else {
-                config::load_or_default(&config_path)?
-            };
-            if let Some(wallet) = args.wallet {
-                cfg.account.wallet = Some(normalize_address(&wallet)?);
-            }
-            config::save(&config_path, &cfg)?;
-            let db_path = db_path(db_override.as_ref(), &cfg);
-            let mut storage = Storage::open(&db_path)?;
-            storage.sync_leaders(&cfg.leaders)?;
-            let response = SetupResponse {
-                config_path,
-                db_path,
-                mode: cfg.global.mode,
-            };
-            print_response(json, &response, || {
-                println!("Config: {}", response.config_path.display());
-                println!("Database: {}", response.db_path.display());
-                println!("Mode: {:?}", response.mode);
-            })
-        }
-        Command::Config { command } => {
-            let cfg = config::load_or_default(&config_path)?;
-            match command {
-                ConfigCommand::Show => {
-                    if cli.json {
-                        print_json(&cfg)
-                    } else {
-                        println!("{}", toml::to_string_pretty(&cfg)?);
-                        Ok(())
-                    }
-                }
-                ConfigCommand::Path => {
-                    let response = ConfigPathResponse {
-                        config_path,
-                        db_path: db_path(db_override.as_ref(), &cfg),
-                    };
-                    print_response(json, &response, || {
-                        println!("Config: {}", response.config_path.display());
-                        println!("Database: {}", response.db_path.display());
-                    })
-                }
-            }
-        }
+        Command::Setup(args) => handle_setup(json, config_path, db_override, args),
+        Command::Config { command } => handle_config(json, config_path, db_override, command),
         Command::Leader { command } => handle_leader(json, config_path, command),
-        Command::Status => {
-            let cfg = config::load_or_default(&config_path)?;
-            let mut storage = Storage::open(&db_path(db_override.as_ref(), &cfg))?;
-            storage.sync_leaders(&cfg.leaders)?;
-            let response = StatusResponse {
-                mode: cfg.global.mode,
-                kill_switch: cfg.global.kill_switch,
-                configured_leaders: cfg.leaders.len(),
-                enabled_leaders: cfg.leaders.iter().filter(|leader| leader.enabled).count(),
-                storage: storage.status()?,
-            };
-            print_response(json, &response, || {
-                println!("Mode: {:?}", response.mode);
-                println!("Kill switch: {}", response.kill_switch);
-                println!(
-                    "Leaders: {} configured, {} enabled",
-                    response.configured_leaders, response.enabled_leaders
-                );
-                println!("Database: {}", response.storage.db_path);
-                println!(
-                    "Audit rows: processed_trades={}, intents={}, paper_fills={}, live_attempts={}",
-                    response.storage.processed_trade_count,
-                    response.storage.copy_intent_count,
-                    response.storage.paper_fill_count,
-                    response.storage.live_order_attempt_count
-                );
-            })
-        }
-        Command::Doctor => {
-            let cfg = config::load_or_default(&config_path)?;
-            cfg.validate()?;
-            let mut storage = Storage::open(&db_path(db_override.as_ref(), &cfg))?;
-            storage.sync_leaders(&cfg.leaders)?;
-            let warnings = doctor_warnings(&cfg);
-            let response = DoctorResponse {
-                ok: warnings.is_empty(),
-                warnings,
-            };
-            print_response(json, &response, || {
-                if response.ok {
-                    println!("Doctor: ok");
-                } else {
-                    println!("Doctor: warnings");
-                    for warning in &response.warnings {
-                        println!("- {warning}");
-                    }
-                }
-            })
-        }
+        Command::Status => handle_status(json, config_path, db_override),
+        Command::Doctor => handle_doctor(json, config_path, db_override),
         Command::Run(args) => {
             let cfg = config::load_or_default(&config_path)?;
             let mode = run_mode(args.mode, args.paper, args.live, cfg.global.mode);
