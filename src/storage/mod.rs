@@ -290,7 +290,7 @@ impl Storage {
         let Some(market_id) = market_id else {
             return Ok(Decimal::ZERO);
         };
-        let value: Option<String> = self.conn.query_row(
+        let paper_value: Option<String> = self.conn.query_row(
             r#"
             SELECT CAST(COALESCE(SUM(CAST(p.notional_usdc AS REAL)), 0) AS TEXT)
             FROM paper_fills p
@@ -302,7 +302,27 @@ impl Storage {
             params![leader_address, market_id],
             |row| row.get(0),
         )?;
-        Ok(parse_decimal_or_zero(value))
+        let live_value: Option<String> = self.conn.query_row(
+            r#"
+            SELECT CAST(COALESCE(SUM(
+                CASE i.side
+                    WHEN 'buy' THEN CAST(i.notional_usdc AS REAL)
+                    WHEN 'sell' THEN -CAST(i.notional_usdc AS REAL)
+                    ELSE 0
+                END
+            ), 0) AS TEXT)
+            FROM copy_intents i
+            JOIN live_order_attempts a ON a.intent_id = i.intent_id
+            WHERE i.leader_address = ?1
+              AND i.market_id = ?2
+              AND i.verdict = 'live'
+              AND a.status = 'submitted'
+            "#,
+            params![leader_address, market_id],
+            |row| row.get(0),
+        )?;
+        Ok(parse_decimal_or_zero(paper_value)
+            + max_decimal(parse_decimal_or_zero(live_value), Decimal::ZERO))
     }
 
     pub fn blocked_counts_by_leader(&self) -> Result<Vec<LeaderBlockedCount>> {
@@ -347,4 +367,8 @@ fn parse_decimal_or_zero(value: Option<String>) -> Decimal {
 
 fn min_decimal(left: Decimal, right: Decimal) -> Decimal {
     if left <= right { left } else { right }
+}
+
+fn max_decimal(left: Decimal, right: Decimal) -> Decimal {
+    if left >= right { left } else { right }
 }

@@ -109,6 +109,85 @@ fn daily_notional_counts_accepted_live_and_paper_intents() {
     let _ = std::fs::remove_file(path);
 }
 
+#[test]
+fn market_open_notional_counts_submitted_live_exposure() {
+    let path = std::env::temp_dir().join(format!(
+        "polyfollow-live-position-{}.sqlite",
+        chrono::Utc::now().timestamp_nanos_opt().unwrap()
+    ));
+    let storage = Storage::open(&path).unwrap();
+    let leader = "0x2222222222222222222222222222222222222222";
+    let token_id = "123";
+
+    let mut submitted_buy = intent(
+        "live-buy-submitted",
+        leader,
+        token_id,
+        TradeSide::Buy,
+        dec!(0.5),
+        dec!(50),
+    );
+    submitted_buy.mode = "live".to_string();
+    submitted_buy.verdict = IntentVerdict::Live;
+    let mut failed_buy = intent(
+        "live-buy-failed",
+        leader,
+        token_id,
+        TradeSide::Buy,
+        dec!(0.5),
+        dec!(80),
+    );
+    failed_buy.mode = "live".to_string();
+    failed_buy.verdict = IntentVerdict::Live;
+    let mut submitted_sell = intent(
+        "live-sell-submitted",
+        leader,
+        token_id,
+        TradeSide::Sell,
+        dec!(0.5),
+        dec!(20),
+    );
+    submitted_sell.mode = "live".to_string();
+    submitted_sell.verdict = IntentVerdict::Live;
+
+    storage.insert_copy_intent(&submitted_buy).unwrap();
+    storage
+        .insert_live_attempt(
+            &submitted_buy.intent_id,
+            "submitted",
+            &serde_json::json!({}),
+            Some(&serde_json::json!({})),
+        )
+        .unwrap();
+    storage.insert_copy_intent(&failed_buy).unwrap();
+    storage
+        .insert_live_attempt(
+            &failed_buy.intent_id,
+            "failed",
+            &serde_json::json!({}),
+            Some(&serde_json::json!({})),
+        )
+        .unwrap();
+    storage.insert_copy_intent(&submitted_sell).unwrap();
+    storage
+        .insert_live_attempt(
+            &submitted_sell.intent_id,
+            "submitted",
+            &serde_json::json!({}),
+            Some(&serde_json::json!({})),
+        )
+        .unwrap();
+
+    assert_eq!(
+        storage
+            .leader_market_open_notional(leader, Some("condition-1"))
+            .unwrap(),
+        dec!(30)
+    );
+
+    let _ = std::fs::remove_file(path);
+}
+
 fn intent(
     trade_id: &str,
     leader: &str,
