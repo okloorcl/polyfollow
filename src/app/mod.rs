@@ -4,6 +4,7 @@ use rust_decimal::Decimal;
 mod admin;
 mod follow;
 mod leaders;
+mod reports;
 mod responses;
 mod support;
 
@@ -23,6 +24,7 @@ use crate::watch;
 use self::admin::{handle_config, handle_doctor, handle_setup, handle_status};
 use self::follow::{run_loop, run_once};
 use self::leaders::handle_leader;
+use self::reports::{handle_live_attempts, handle_logs, handle_orders, handle_pnl};
 use self::responses::RunResponse;
 use self::support::{config_path, db_path, print_response, run_mode};
 
@@ -79,81 +81,10 @@ pub async fn run(cli: Cli) -> Result<()> {
                 println!("{}", response.message);
             })
         }
-        Command::Orders(args) => {
-            let cfg = config::load_or_default(&config_path)?;
-            let storage = Storage::open(&db_path(db_override.as_ref(), &cfg))?;
-            let rows = storage.recent_intents(args.limit)?;
-            print_response(json, &rows, || {
-                if rows.is_empty() {
-                    println!("No copy intents yet.");
-                    return;
-                }
-                for row in &rows {
-                    println!(
-                        "{} {} {} notional={} verdict={} at={}",
-                        row.side,
-                        row.leader_address,
-                        row.trade_id,
-                        row.notional_usdc,
-                        row.verdict,
-                        row.created_at
-                    );
-                }
-            })
-        }
-        Command::Pnl => {
-            let cfg = config::load_or_default(&config_path)?;
-            let storage = Storage::open(&db_path(db_override.as_ref(), &cfg))?;
-            let summary = storage.pnl_summary()?;
-            print_response(json, &summary, || {
-                println!("Open paper fills: {}", summary.open_paper_fills);
-                println!("Closed paper fills: {}", summary.closed_paper_fills);
-                println!("Open notional USDC: {}", summary.open_notional_usdc);
-                println!("Realized PnL USDC: {}", summary.realized_pnl_usdc);
-            })
-        }
-        Command::LiveAttempts(args) => {
-            let cfg = config::load_or_default(&config_path)?;
-            let storage = Storage::open(&db_path(db_override.as_ref(), &cfg))?;
-            let rows = storage.recent_live_attempts(args.limit)?;
-            print_response(json, &rows, || {
-                if rows.is_empty() {
-                    println!("No live order attempts yet.");
-                    return;
-                }
-                for row in &rows {
-                    let order_id = row.order_id.as_deref().unwrap_or("-");
-                    let exchange_status = row.exchange_status.as_deref().unwrap_or("-");
-                    println!(
-                        "{} status={} exchange_status={} success={:?} order_id={} txs={} at={}",
-                        row.intent_id,
-                        row.status,
-                        exchange_status,
-                        row.success,
-                        order_id,
-                        row.transaction_hashes.len(),
-                        row.created_at
-                    );
-                }
-            })
-        }
-        Command::Logs(args) => {
-            let cfg = config::load_or_default(&config_path)?;
-            let storage = Storage::open(&db_path(db_override.as_ref(), &cfg))?;
-            let rows = storage.recent_logs(args.limit)?;
-            print_response(json, &rows, || {
-                if rows.is_empty() {
-                    println!("No observed trades yet.");
-                    return;
-                }
-                for row in &rows {
-                    println!(
-                        "{} {} source={} status={} at={}",
-                        row.leader_address, row.trade_id, row.source, row.status, row.observed_at
-                    );
-                }
-            })
-        }
+        Command::Orders(args) => handle_orders(json, config_path, db_override, args),
+        Command::Pnl => handle_pnl(json, config_path, db_override),
+        Command::LiveAttempts(args) => handle_live_attempts(json, config_path, db_override, args),
+        Command::Logs(args) => handle_logs(json, config_path, db_override, args),
         Command::Serve(args) => {
             let cfg = config::load_or_default(&config_path)?;
             let db_path = db_path(db_override.as_ref(), &cfg);
