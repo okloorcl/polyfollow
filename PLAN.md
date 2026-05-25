@@ -14,6 +14,8 @@ PolyFollow executes paper/live follow decisions with strict risk controls.
   auditable in SQLite.
 - Private keys must not be logged or stored in the trade database.
 - Money is represented with decimal types, not floating point.
+- Continuous polling should survive transient API/network failures and stop
+  gracefully on Ctrl-C.
 
 ## Architecture
 
@@ -76,6 +78,8 @@ leader sources
 - [x] GitHub Actions CI for formatting, clippy, tests, and multi-target builds.
 - [x] Tag-driven GitHub Release workflow for multi-platform binaries and
       checksums.
+- [x] Daemon-friendly continuous `run` loop with graceful Ctrl-C shutdown,
+      aggregated run stats, and configurable consecutive-error tolerance.
 
 ## References Studied
 

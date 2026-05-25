@@ -42,6 +42,8 @@ pub struct GlobalConfig {
     pub clob_base_url: String,
     #[serde(default = "default_poll_interval_secs")]
     pub poll_interval_secs: u64,
+    #[serde(default = "default_max_consecutive_errors")]
+    pub max_consecutive_errors: u32,
     #[serde(default = "default_max_daily_loss")]
     pub max_daily_loss_usdc: Decimal,
     #[serde(default = "default_max_open_positions")]
@@ -156,6 +158,7 @@ impl Default for GlobalConfig {
             data_api_base_url: default_data_api_base_url(),
             clob_base_url: default_clob_base_url(),
             poll_interval_secs: default_poll_interval_secs(),
+            max_consecutive_errors: default_max_consecutive_errors(),
             max_daily_loss_usdc: default_max_daily_loss(),
             max_open_positions: default_max_open_positions(),
             kill_switch: false,

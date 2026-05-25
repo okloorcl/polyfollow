@@ -55,12 +55,17 @@ pub async fn run(cli: Cli) -> Result<()> {
             let run_stats = if args.once {
                 run_once(&cfg, &mut storage, mode, args.limit).await?
             } else {
-                run_loop(&cfg, &mut storage, mode, args.limit).await?
+                let max_consecutive_errors = args
+                    .max_consecutive_errors
+                    .unwrap_or(cfg.global.max_consecutive_errors);
+                run_loop(&cfg, &mut storage, mode, args.limit, max_consecutive_errors).await?
             };
             let response = RunResponse {
                 mode,
                 once: args.once,
                 enabled_leaders: cfg.leaders.iter().filter(|leader| leader.enabled).count(),
+                cycles: run_stats.cycles,
+                failed_cycles: run_stats.failed_cycles,
                 fetched_trades: run_stats.fetched_trades,
                 new_trades: run_stats.new_trades,
                 blocked_intents: run_stats.blocked_intents,
@@ -69,10 +74,12 @@ pub async fn run(cli: Cli) -> Result<()> {
             };
             print_response(json, &response, || {
                 println!(
-                    "Run: {:?}, enabled leaders={}, once={}, fetched={}, new={}, paper={}, blocked={}",
+                    "Run: {:?}, enabled leaders={}, once={}, cycles={}, failed_cycles={}, fetched={}, new={}, paper={}, blocked={}",
                     response.mode,
                     response.enabled_leaders,
                     response.once,
+                    response.cycles,
+                    response.failed_cycles,
                     response.fetched_trades,
                     response.new_trades,
                     response.paper_fills,

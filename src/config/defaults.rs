@@ -29,6 +29,10 @@ pub(super) fn default_poll_interval_secs() -> u64 {
     2
 }
 
+pub(super) fn default_max_consecutive_errors() -> u32 {
+    0
+}
+
 pub(super) fn default_max_daily_loss() -> Decimal {
     dec!(100)
 }

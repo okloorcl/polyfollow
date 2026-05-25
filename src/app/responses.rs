@@ -46,6 +46,8 @@ pub(super) struct RunResponse {
     pub mode: ExecutionMode,
     pub once: bool,
     pub enabled_leaders: usize,
+    pub cycles: usize,
+    pub failed_cycles: usize,
     pub fetched_trades: usize,
     pub new_trades: usize,
     pub blocked_intents: usize,
@@ -55,6 +57,8 @@ pub(super) struct RunResponse {
 
 #[derive(Debug, Default)]
 pub(super) struct RunStats {
+    pub cycles: usize,
+    pub failed_cycles: usize,
     pub fetched_trades: usize,
     pub new_trades: usize,
     pub blocked_intents: usize,

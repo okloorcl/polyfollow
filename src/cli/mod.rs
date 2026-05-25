@@ -125,6 +125,10 @@ pub struct RunArgs {
     /// Max activities to request per leader per polling cycle.
     #[arg(long, default_value_t = 100)]
     pub limit: usize,
+
+    /// Max consecutive failed polling cycles before exiting. 0 means keep running.
+    #[arg(long)]
+    pub max_consecutive_errors: Option<u32>,
 }
 
 #[derive(Debug, Args)]

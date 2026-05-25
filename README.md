@@ -135,6 +135,7 @@ Run a single paper cycle:
 
 ```bash
 polyfollow run --paper --once
+polyfollow run --paper
 polyfollow orders
 polyfollow logs
 polyfollow pnl
@@ -284,6 +285,7 @@ Use `--dry-run` first. Remove it only after the candidate set looks right.
 ```bash
 polyfollow run --paper --once
 polyfollow run --paper --limit 100
+polyfollow run --paper --max-consecutive-errors 10
 polyfollow run --mode paper
 polyfollow run --live --confirm-live --once
 ```
@@ -299,6 +301,18 @@ The loop does this for every enabled leader:
 6. Record a copy intent.
 7. Execute through paper ledger or live CLOB adapter.
 8. Persist audit rows and optional notifications.
+
+Continuous mode is daemon-friendly. A failed polling cycle is logged and the
+next cycle continues. `--max-consecutive-errors 0` means never stop because of
+consecutive polling errors; this is also the default through
+`global.max_consecutive_errors = 0`. Use a positive value when you prefer the
+process to exit after repeated failures:
+
+```bash
+polyfollow run --paper --max-consecutive-errors 10
+```
+
+Press `Ctrl-C` to stop gracefully and print the final run summary.
 
 ### State And Reports
 
@@ -434,6 +448,7 @@ db_path = "/Users/you/.local/share/polyfollow/polyfollow.sqlite"
 data_api_base_url = "https://data-api.polymarket.com"
 clob_base_url = "https://clob.polymarket.com"
 poll_interval_secs = 10
+max_consecutive_errors = 0
 max_daily_loss_usdc = "100"
 max_open_positions = 50
 kill_switch = false
@@ -483,6 +498,7 @@ notify_blocked = false
 | --- | --- |
 | Paper default | `setup` and normal `run` behavior stay in paper mode unless changed |
 | Live confirmation | Live requires `--live --confirm-live` |
+| Daemon-friendly loop | Continuous `run` logs failed cycles and keeps polling by default |
 | Environment keys | Private keys are read from env vars only |
 | Kill switch | `global.kill_switch = true` blocks new copy execution |
 | Global caps | `max_open_positions` and the stricter global/account daily-loss cap block new buys |
@@ -630,7 +646,7 @@ See [PLAN.md](PLAN.md). The current roadmap has completed:
 - P1: CLOB websocket watcher, on-chain backup watcher, FIFO PnL, multi-account
   keys, notifications, PolyAlpha import, local HTTP API.
 - P2: static dashboard, backtesting, cooldown audit, allocation optimizer,
-  MarketBridge context.
+  MarketBridge context, daemon-friendly run loop.
 
 Future work can focus on release automation, richer dashboards, more exchange
 telemetry, and deeper strategy evaluation.

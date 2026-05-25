@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use chrono::Utc;
+use tokio::time::{Duration, sleep};
 
 use crate::config::{AppConfig, ExecutionMode};
 use crate::engine::{RiskContext, build_intent};
@@ -116,6 +117,7 @@ pub(super) async fn run_once(
             }
         }
     }
+    stats.cycles = 1;
     Ok(stats)
 }
 
@@ -148,17 +150,78 @@ pub(super) async fn run_loop(
     storage: &mut Storage,
     mode: ExecutionMode,
     limit: usize,
+    max_consecutive_errors: u32,
 ) -> Result<RunStats> {
+    let mut total = RunStats::default();
+    let mut consecutive_errors = 0_u32;
     loop {
-        let stats = run_once(cfg, storage, mode, limit).await?;
-        println!(
-            "cycle: fetched={}, new={}, paper={}, blocked={}",
-            stats.fetched_trades, stats.new_trades, stats.paper_fills, stats.blocked_intents
-        );
-        tokio::time::sleep(std::time::Duration::from_secs(
-            cfg.global.poll_interval_secs,
-        ))
-        .await;
+        let cycle = tokio::select! {
+            result = run_once(cfg, storage, mode, limit) => result,
+            _ = tokio::signal::ctrl_c() => {
+                tracing::info!("received shutdown signal");
+                return Ok(total);
+            }
+        };
+
+        match cycle {
+            Ok(stats) => {
+                consecutive_errors = 0;
+                total.add(&stats);
+                println!(
+                    "cycle: fetched={}, new={}, paper={}, blocked={}",
+                    stats.fetched_trades,
+                    stats.new_trades,
+                    stats.paper_fills,
+                    stats.blocked_intents
+                );
+            }
+            Err(error) => {
+                consecutive_errors = consecutive_errors.saturating_add(1);
+                total.cycles += 1;
+                total.failed_cycles += 1;
+                tracing::error!(
+                    error = %error,
+                    consecutive_errors,
+                    max_consecutive_errors,
+                    "polling cycle failed"
+                );
+                eprintln!(
+                    "cycle failed: {error}; consecutive_errors={consecutive_errors}; max_consecutive_errors={max_consecutive_errors}"
+                );
+                if max_consecutive_errors > 0 && consecutive_errors >= max_consecutive_errors {
+                    return Err(error).with_context(|| {
+                        format!(
+                            "max consecutive polling errors reached: {consecutive_errors}/{max_consecutive_errors}"
+                        )
+                    });
+                }
+            }
+        }
+
+        if sleep_or_shutdown(cfg.global.poll_interval_secs).await {
+            return Ok(total);
+        }
+    }
+}
+
+async fn sleep_or_shutdown(seconds: u64) -> bool {
+    tokio::select! {
+        _ = sleep(Duration::from_secs(seconds)) => false,
+        _ = tokio::signal::ctrl_c() => {
+            tracing::info!("received shutdown signal");
+            true
+        }
+    }
+}
+
+impl RunStats {
+    fn add(&mut self, other: &Self) {
+        self.cycles += other.cycles;
+        self.failed_cycles += other.failed_cycles;
+        self.fetched_trades += other.fetched_trades;
+        self.new_trades += other.new_trades;
+        self.blocked_intents += other.blocked_intents;
+        self.paper_fills += other.paper_fills;
     }
 }
 
@@ -191,5 +254,34 @@ mod tests {
 
         assert!(message.contains("UNMATCHED"));
         assert!(message.contains("insufficient balance"));
+    }
+
+    #[test]
+    fn run_stats_add_accumulates_cycles_and_counts() {
+        let mut left = RunStats {
+            cycles: 1,
+            failed_cycles: 0,
+            fetched_trades: 2,
+            new_trades: 1,
+            blocked_intents: 0,
+            paper_fills: 1,
+        };
+        let right = RunStats {
+            cycles: 1,
+            failed_cycles: 1,
+            fetched_trades: 3,
+            new_trades: 2,
+            blocked_intents: 1,
+            paper_fills: 0,
+        };
+
+        left.add(&right);
+
+        assert_eq!(left.cycles, 2);
+        assert_eq!(left.failed_cycles, 1);
+        assert_eq!(left.fetched_trades, 5);
+        assert_eq!(left.new_trades, 3);
+        assert_eq!(left.blocked_intents, 1);
+        assert_eq!(left.paper_fills, 1);
     }
 }
