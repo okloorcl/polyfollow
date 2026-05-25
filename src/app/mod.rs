@@ -112,6 +112,31 @@ pub async fn run(cli: Cli) -> Result<()> {
                 println!("Realized PnL USDC: {}", summary.realized_pnl_usdc);
             })
         }
+        Command::LiveAttempts(args) => {
+            let cfg = config::load_or_default(&config_path)?;
+            let storage = Storage::open(&db_path(db_override.as_ref(), &cfg))?;
+            let rows = storage.recent_live_attempts(args.limit)?;
+            print_response(json, &rows, || {
+                if rows.is_empty() {
+                    println!("No live order attempts yet.");
+                    return;
+                }
+                for row in &rows {
+                    let order_id = row.order_id.as_deref().unwrap_or("-");
+                    let exchange_status = row.exchange_status.as_deref().unwrap_or("-");
+                    println!(
+                        "{} status={} exchange_status={} success={:?} order_id={} txs={} at={}",
+                        row.intent_id,
+                        row.status,
+                        exchange_status,
+                        row.success,
+                        order_id,
+                        row.transaction_hashes.len(),
+                        row.created_at
+                    );
+                }
+            })
+        }
         Command::Logs(args) => {
             let cfg = config::load_or_default(&config_path)?;
             let storage = Storage::open(&db_path(db_override.as_ref(), &cfg))?;

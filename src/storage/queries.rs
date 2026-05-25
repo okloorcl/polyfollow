@@ -1,8 +1,10 @@
 use anyhow::Result;
 use rusqlite::params;
+use serde_json::Value;
 
 use super::{
-    IntentRow, LeaderBlockedCount, PnlSummary, Storage, TradeLogRow, parse_decimal_or_zero,
+    IntentRow, LeaderBlockedCount, LiveAttemptRow, PnlSummary, Storage, TradeLogRow,
+    parse_decimal_or_zero,
 };
 
 impl Storage {
@@ -61,6 +63,38 @@ impl Storage {
                 source: row.get(2)?,
                 status: row.get(3)?,
                 observed_at: row.get(4)?,
+            })
+        })?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    pub fn recent_live_attempts(&self, limit: usize) -> Result<Vec<LiveAttemptRow>> {
+        let mut stmt = self.conn.prepare(
+            r#"
+            SELECT attempt_id, intent_id, status, response_json, created_at
+            FROM live_order_attempts
+            ORDER BY created_at DESC, attempt_id DESC
+            LIMIT ?1
+            "#,
+        )?;
+        let rows = stmt.query_map(params![limit as i64], |row| {
+            let response_json: Option<String> = row.get(3)?;
+            let response = response_json
+                .as_deref()
+                .and_then(|raw| serde_json::from_str::<Value>(raw).ok());
+            Ok(LiveAttemptRow {
+                attempt_id: row.get(0)?,
+                intent_id: row.get(1)?,
+                status: row.get(2)?,
+                order_id: json_string(&response, "order_id"),
+                exchange_status: json_string(&response, "status"),
+                success: response
+                    .as_ref()
+                    .and_then(|value| value.get("success"))
+                    .and_then(Value::as_bool),
+                error_msg: json_string(&response, "error_msg"),
+                transaction_hashes: json_string_array(&response, "transaction_hashes"),
+                created_at: row.get(4)?,
             })
         })?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
@@ -131,4 +165,27 @@ impl Storage {
         )?;
         Ok(parse_decimal_or_zero(value))
     }
+}
+
+fn json_string(value: &Option<Value>, key: &str) -> Option<String> {
+    value
+        .as_ref()
+        .and_then(|value| value.get(key))
+        .and_then(Value::as_str)
+        .map(ToOwned::to_owned)
+}
+
+fn json_string_array(value: &Option<Value>, key: &str) -> Vec<String> {
+    value
+        .as_ref()
+        .and_then(|value| value.get(key))
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(ToOwned::to_owned)
+                .collect()
+        })
+        .unwrap_or_default()
 }

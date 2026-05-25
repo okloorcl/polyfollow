@@ -5,6 +5,8 @@ use rusqlite::Connection;
 use rust_decimal::Decimal;
 
 mod ledger;
+#[cfg(test)]
+mod live_tests;
 mod queries;
 mod risk;
 mod rows;
@@ -15,7 +17,9 @@ mod writes;
 
 use crate::types::IntentVerdict;
 
-pub use rows::{IntentRow, LeaderBlockedCount, PnlSummary, StorageStatus, TradeLogRow};
+pub use rows::{
+    IntentRow, LeaderBlockedCount, LiveAttemptRow, PnlSummary, StorageStatus, TradeLogRow,
+};
 
 pub struct Storage {
     conn: Connection,

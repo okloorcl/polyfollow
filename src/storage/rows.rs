@@ -37,6 +37,19 @@ pub struct TradeLogRow {
 }
 
 #[derive(Debug, Serialize)]
+pub struct LiveAttemptRow {
+    pub attempt_id: String,
+    pub intent_id: String,
+    pub status: String,
+    pub order_id: Option<String>,
+    pub exchange_status: Option<String>,
+    pub success: Option<bool>,
+    pub error_msg: Option<String>,
+    pub transaction_hashes: Vec<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Serialize)]
 pub struct PnlSummary {
     pub open_paper_fills: i64,
     pub closed_paper_fills: i64,

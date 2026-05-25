@@ -254,7 +254,7 @@ fn token_open_shares_can_include_submitted_live_exposure() {
     let _ = std::fs::remove_file(path);
 }
 
-fn intent(
+pub(super) fn intent(
     trade_id: &str,
     leader: &str,
     token_id: &str,

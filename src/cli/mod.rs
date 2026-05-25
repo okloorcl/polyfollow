@@ -59,6 +59,8 @@ pub enum Command {
     Orders(LimitArgs),
     /// Show paper/live PnL summary.
     Pnl,
+    /// List recent live order submissions and exchange responses.
+    LiveAttempts(LimitArgs),
     /// Show recent observed leader trades.
     Logs(LimitArgs),
     /// Start a local read-only HTTP API.
