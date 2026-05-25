@@ -52,7 +52,7 @@ fn paper_sell_closes_fifo_and_records_realized_pnl() {
     assert_eq!(result.realized_pnl_usdc, dec!(5.0));
     assert_eq!(
         storage
-            .leader_token_open_shares(leader, Some(token_id))
+            .leader_token_open_shares(leader, Some(token_id), false)
             .unwrap(),
         dec!(50)
     );
@@ -183,6 +183,72 @@ fn market_open_notional_counts_submitted_live_exposure() {
             .leader_market_open_notional(leader, Some("condition-1"))
             .unwrap(),
         dec!(30)
+    );
+
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn token_open_shares_can_include_submitted_live_exposure() {
+    let path = std::env::temp_dir().join(format!(
+        "polyfollow-live-shares-{}.sqlite",
+        chrono::Utc::now().timestamp_nanos_opt().unwrap()
+    ));
+    let storage = Storage::open(&path).unwrap();
+    let leader = "0x2222222222222222222222222222222222222222";
+    let token_id = "123";
+
+    let mut buy = intent(
+        "live-share-buy",
+        leader,
+        token_id,
+        TradeSide::Buy,
+        dec!(0.5),
+        dec!(50),
+    );
+    buy.mode = "live".to_string();
+    buy.verdict = IntentVerdict::Live;
+    let mut sell = intent(
+        "live-share-sell",
+        leader,
+        token_id,
+        TradeSide::Sell,
+        dec!(0.5),
+        dec!(20),
+    );
+    sell.mode = "live".to_string();
+    sell.verdict = IntentVerdict::Live;
+
+    storage.insert_copy_intent(&buy).unwrap();
+    storage
+        .insert_live_attempt(
+            &buy.intent_id,
+            "submitted",
+            &serde_json::json!({}),
+            Some(&serde_json::json!({})),
+        )
+        .unwrap();
+    storage.insert_copy_intent(&sell).unwrap();
+    storage
+        .insert_live_attempt(
+            &sell.intent_id,
+            "submitted",
+            &serde_json::json!({}),
+            Some(&serde_json::json!({})),
+        )
+        .unwrap();
+
+    assert_eq!(
+        storage
+            .leader_token_open_shares(leader, Some(token_id), false)
+            .unwrap(),
+        Decimal::ZERO
+    );
+    assert_eq!(
+        storage
+            .leader_token_open_shares(leader, Some(token_id), true)
+            .unwrap(),
+        dec!(60)
     );
 
     let _ = std::fs::remove_file(path);

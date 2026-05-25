@@ -72,7 +72,11 @@ fn replay(
             market_open_notional_usdc: storage
                 .leader_market_open_notional(&leader.address, trade.condition_id.as_deref())?,
             available_position_shares: if trade.side == TradeSide::Sell {
-                Some(storage.leader_token_open_shares(&leader.address, trade.token_id.as_deref())?)
+                Some(storage.leader_token_open_shares(
+                    &leader.address,
+                    trade.token_id.as_deref(),
+                    false,
+                )?)
             } else {
                 None
             },
