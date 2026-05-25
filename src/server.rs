@@ -43,6 +43,7 @@ pub async fn serve(config: AppConfig, db_path: PathBuf, addr: &str) -> Result<()
         .route("/status", get(status))
         .route("/leaders", get(leaders))
         .route("/orders", get(orders))
+        .route("/live-attempts", get(live_attempts))
         .route("/logs", get(logs))
         .route("/pnl", get(pnl))
         .with_state(state);
@@ -98,6 +99,17 @@ async fn logs(
         .recent_logs(query.limit.unwrap_or(20))
         .map_err(internal_error)?;
     Ok(Json(serde_json::json!({ "logs": rows })))
+}
+
+async fn live_attempts(
+    State(state): State<ApiState>,
+    Query(query): Query<LimitQuery>,
+) -> ApiResult<serde_json::Value> {
+    let storage = open_storage(&state)?;
+    let rows = storage
+        .recent_live_attempts(query.limit.unwrap_or(20))
+        .map_err(internal_error)?;
+    Ok(Json(serde_json::json!({ "live_attempts": rows })))
 }
 
 async fn pnl(State(state): State<ApiState>) -> ApiResult<serde_json::Value> {

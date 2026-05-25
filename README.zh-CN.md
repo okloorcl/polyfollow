@@ -318,6 +318,7 @@ curl http://127.0.0.1:8787/health
 curl http://127.0.0.1:8787/status
 curl http://127.0.0.1:8787/leaders
 curl 'http://127.0.0.1:8787/orders?limit=20'
+curl 'http://127.0.0.1:8787/live-attempts?limit=20'
 curl 'http://127.0.0.1:8787/logs?limit=20'
 curl http://127.0.0.1:8787/pnl
 ```
