@@ -3064,7 +3064,7 @@ dependencies = [
  "clap",
  "dirs",
  "futures-util",
- "polymarket-client-sdk",
+ "polymarket_client_sdk_v2",
  "reqwest 0.12.28",
  "rusqlite",
  "rust_decimal",
@@ -3082,10 +3082,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "polymarket-client-sdk"
-version = "0.4.4"
+name = "polymarket_client_sdk_v2"
+version = "0.6.0-canary.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0852dbe6df78c4964452d6071abdc7ec0f649042c76733a075cb79e322745eaa"
+checksum = "60838f2225e2bf6578bc5f5e81fc7de5f855b611a6b4f0f3b65fa3c41f7d593f"
 dependencies = [
  "alloy",
  "async-stream",
@@ -3107,6 +3107,7 @@ dependencies = [
  "serde_json",
  "serde_repr",
  "serde_with",
+ "sha1",
  "sha2",
  "strum_macros 0.28.0",
  "url",

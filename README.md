@@ -101,10 +101,14 @@ the `polyfollow run --paper` command. Do not write `cargo run polyfollow run`.
 
 ## Quick Start
 
-Create a config and database:
+Create a config and database. For current Polymarket deposit-wallet accounts,
+`wallet` is the public profile/proxy address and `funder` is the deposit address
+shown in the recharge dialog:
 
 ```bash
-polyfollow setup --wallet 0x1111111111111111111111111111111111111111
+polyfollow setup \
+  --wallet 0x1111111111111111111111111111111111111111 \
+  --funder 0x2222222222222222222222222222222222222222
 polyfollow doctor
 polyfollow config path
 ```
@@ -169,13 +173,17 @@ falls back to `POLYFOLLOW_PRIVATE_KEY`, then `POLYMARKET_PRIVATE_KEY`.
 ```toml
 [[accounts]]
 name = "research"
-wallet = "0x1111111111111111111111111111111111111111"
-signature_type = "proxy"
+wallet = "0x1111111111111111111111111111111111111111" # public profile/proxy address
+funder = "0x2222222222222222222222222222222222222222" # deposit wallet / recharge address
+signature_type = "poly-1271"
 ```
 
-`signature_type` is validated strictly. Use `proxy`, `gnosis-safe`, or `eoa`;
-unknown values are rejected instead of silently falling back to another signing
-mode.
+`signature_type` is validated strictly. Use `poly-1271` for current Polymarket
+deposit wallets, or `proxy`, `gnosis-safe`, `eoa` for older account types.
+Unknown values are rejected instead of silently falling back to another signing
+mode. `poly-1271`, `proxy`, and `gnosis-safe` live orders require a funder
+address; PolyFollow uses `account.funder` first and falls back to
+`account.wallet` for backward compatibility.
 
 ```bash
 export POLYFOLLOW_PRIVATE_KEY_RESEARCH="0x..."
@@ -221,7 +229,9 @@ they do not inflate open live exposure.
 
 ```bash
 polyfollow setup
-polyfollow setup --wallet 0x1111111111111111111111111111111111111111
+polyfollow setup \
+  --wallet 0x1111111111111111111111111111111111111111 \
+  --funder 0x2222222222222222222222222222222222222222
 polyfollow setup --force
 polyfollow config show
 polyfollow config path
@@ -456,9 +466,10 @@ kill_switch = false
 [account]
 name = "main"
 wallet = "0x1111111111111111111111111111111111111111"
+funder = "0x2222222222222222222222222222222222222222"
 max_capital_usdc = "1000"
 max_daily_loss_usdc = "50"
-signature_type = "proxy"
+signature_type = "poly-1271"
 
 [[leaders]]
 address = "0x2222222222222222222222222222222222222222"

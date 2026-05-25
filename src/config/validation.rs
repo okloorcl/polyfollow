@@ -23,6 +23,9 @@ impl AppConfig {
         if let Some(wallet) = &self.account.wallet {
             validate_address(wallet).context("account.wallet is not a valid address")?;
         }
+        if let Some(funder) = &self.account.funder {
+            validate_address(funder).context("account.funder is not a valid address")?;
+        }
         let mut account_names = std::collections::HashSet::new();
         account_names.insert(self.account.name.clone());
         for account in &self.accounts {
@@ -33,6 +36,10 @@ impl AppConfig {
             if let Some(wallet) = &account.wallet {
                 validate_address(wallet)
                     .with_context(|| format!("account {} wallet is invalid", account.name))?;
+            }
+            if let Some(funder) = &account.funder {
+                validate_address(funder)
+                    .with_context(|| format!("account {} funder is invalid", account.name))?;
             }
         }
         for leader in &self.leaders {

@@ -54,7 +54,7 @@ pub(super) fn default_account_max_daily_loss() -> Decimal {
 }
 
 pub(super) fn default_signature_type() -> String {
-    "proxy".to_string()
+    "poly-1271".to_string()
 }
 
 pub(super) fn default_true() -> bool {

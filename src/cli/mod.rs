@@ -83,9 +83,13 @@ pub enum Command {
 
 #[derive(Debug, Args)]
 pub struct SetupArgs {
-    /// Your proxy wallet address. Can be set later.
+    /// Your public profile/proxy wallet address. Can be set later.
     #[arg(long)]
     pub wallet: Option<String>,
+
+    /// Funder/deposit wallet address used for live CLOB orders.
+    #[arg(long)]
+    pub funder: Option<String>,
 
     /// Overwrite an existing config file.
     #[arg(long)]

@@ -16,6 +16,8 @@ PolyFollow executes paper/live follow decisions with strict risk controls.
 - Money is represented with decimal types, not floating point.
 - Continuous polling should survive transient API/network failures and stop
   gracefully on Ctrl-C.
+- Current Polymarket deposit-wallet accounts should use `signature_type =
+  "poly-1271"` with an explicit `account.funder` deposit address.
 
 ## Architecture
 
@@ -80,6 +82,8 @@ leader sources
       checksums.
 - [x] Daemon-friendly continuous `run` loop with graceful Ctrl-C shutdown,
       aggregated run stats, and configurable consecutive-error tolerance.
+- [x] Polymarket CLOB v2 / Poly1271 deposit-wallet live signing with explicit
+      funder/deposit wallet configuration.
 
 ## References Studied
 

@@ -93,10 +93,13 @@ cargo run -- run --paper --once
 
 ## 快速开始
 
-创建配置和数据库：
+创建配置和数据库。对现在的 Polymarket deposit-wallet 账户来说，`wallet`
+是公开 profile/proxy 地址，`funder` 是充值弹窗里的 deposit address：
 
 ```bash
-polyfollow setup --wallet 0x1111111111111111111111111111111111111111
+polyfollow setup \
+  --wallet 0x1111111111111111111111111111111111111111 \
+  --funder 0x2222222222222222222222222222222222222222
 polyfollow doctor
 polyfollow config path
 ```
@@ -167,12 +170,16 @@ polyfollow run --live --confirm-live
 ```toml
 [[accounts]]
 name = "research"
-wallet = "0x1111111111111111111111111111111111111111"
-signature_type = "proxy"
+wallet = "0x1111111111111111111111111111111111111111" # public profile/proxy address
+funder = "0x2222222222222222222222222222222222222222" # deposit wallet / 充值地址
+signature_type = "poly-1271"
 ```
 
-`signature_type` 会严格校验，只允许 `proxy`、`gnosis-safe` 或 `eoa`。
-未知值会直接报错，不会静默回退到其他签名模式。
+`signature_type` 会严格校验。当前 Polymarket deposit wallet 使用
+`poly-1271`；老账户类型可使用 `proxy`、`gnosis-safe` 或 `eoa`。未知值会
+直接报错，不会静默回退到其他签名模式。`poly-1271`、`proxy`、
+`gnosis-safe` 的 live 订单需要 funder 地址；PolyFollow 优先使用
+`account.funder`，为了兼容旧配置才会回退到 `account.wallet`。
 
 ```bash
 export POLYFOLLOW_PRIVATE_KEY_RESEARCH="0x..."
@@ -215,7 +222,9 @@ polyfollow --json live-attempts --limit 20
 
 ```bash
 polyfollow setup
-polyfollow setup --wallet 0x1111111111111111111111111111111111111111
+polyfollow setup \
+  --wallet 0x1111111111111111111111111111111111111111 \
+  --funder 0x2222222222222222222222222222222222222222
 polyfollow setup --force
 polyfollow config show
 polyfollow config path
@@ -437,9 +446,10 @@ kill_switch = false
 [account]
 name = "main"
 wallet = "0x1111111111111111111111111111111111111111"
+funder = "0x2222222222222222222222222222222222222222"
 max_capital_usdc = "1000"
 max_daily_loss_usdc = "50"
-signature_type = "proxy"
+signature_type = "poly-1271"
 
 [[leaders]]
 address = "0x2222222222222222222222222222222222222222"

@@ -2,12 +2,12 @@ use chrono::Utc;
 use std::str::FromStr;
 
 use anyhow::{Context, Result};
-use polymarket_client_sdk::POLYGON;
-use polymarket_client_sdk::auth::{LocalSigner, Signer as _};
-use polymarket_client_sdk::clob;
-use polymarket_client_sdk::clob::types::response::PostOrderResponse;
-use polymarket_client_sdk::clob::types::{Amount, OrderType, Side, SignatureType};
-use polymarket_client_sdk::types::{Decimal as SdkDecimal, U256};
+use polymarket_client_sdk_v2::POLYGON;
+use polymarket_client_sdk_v2::auth::{LocalSigner, Signer as _};
+use polymarket_client_sdk_v2::clob::types::response::PostOrderResponse;
+use polymarket_client_sdk_v2::clob::types::{Amount, OrderType, Side, SignatureType};
+use polymarket_client_sdk_v2::clob::{Client, Config};
+use polymarket_client_sdk_v2::types::{Address, Decimal as SdkDecimal, U256};
 
 use crate::config::AccountConfig;
 use crate::types::{CopyIntent, IntentVerdict, PaperFill, TradeSide};
@@ -30,11 +30,13 @@ pub fn paper_fill_for(intent: &CopyIntent) -> Option<PaperFill> {
 #[derive(Debug, Clone)]
 pub struct LiveExecutionConfig {
     pub private_key: String,
+    pub clob_base_url: String,
+    pub funder: Option<Address>,
     pub signature_type: SignatureType,
 }
 
 impl LiveExecutionConfig {
-    pub fn from_env(account: &AccountConfig) -> Result<Self> {
+    pub fn from_env(account: &AccountConfig, clob_base_url: &str) -> Result<Self> {
         let env_keys = private_key_env_candidates(&account.name);
         let private_key = std::env::var(&env_keys[0])
             .or_else(|_| std::env::var("POLYFOLLOW_PRIVATE_KEY"))
@@ -45,9 +47,25 @@ impl LiveExecutionConfig {
                     env_keys[0]
                 )
             })?;
+        let signature_type = parse_signature_type(&account.signature_type)?;
+        let funder = account
+            .funder
+            .as_deref()
+            .or(account.wallet.as_deref())
+            .map(Address::from_str)
+            .transpose()
+            .context("account funder/wallet is not a valid address")?;
+        if requires_funder(signature_type) && funder.is_none() {
+            anyhow::bail!(
+                "signature_type {} requires account.funder or account.wallet",
+                account.signature_type
+            );
+        }
         Ok(Self {
             private_key,
-            signature_type: parse_signature_type(&account.signature_type)?,
+            clob_base_url: clob_base_url.trim_end_matches('/').to_string(),
+            funder,
+            signature_type,
         })
     }
 }
@@ -63,9 +81,13 @@ pub async fn execute_live_market_order(
     let signer = LocalSigner::from_str(&config.private_key)
         .context("invalid private key")?
         .with_chain_id(Some(POLYGON));
-    let client = clob::Client::default()
+    let mut auth = Client::new(&config.clob_base_url, Config::default())?
         .authentication_builder(&signer)
-        .signature_type(config.signature_type)
+        .signature_type(config.signature_type);
+    if let Some(funder) = config.funder {
+        auth = auth.funder(funder);
+    }
+    let client = auth
         .authenticate()
         .await
         .context("failed to authenticate with Polymarket CLOB")?;
@@ -120,10 +142,20 @@ pub(crate) fn parse_signature_type(value: &str) -> Result<SignatureType> {
         "eoa" => Ok(SignatureType::Eoa),
         "proxy" => Ok(SignatureType::Proxy),
         "gnosis-safe" => Ok(SignatureType::GnosisSafe),
+        "poly-1271" | "poly1271" | "poly_1271" => Ok(SignatureType::Poly1271),
         _ => {
-            anyhow::bail!("unsupported signature_type {value}; expected eoa, proxy, or gnosis-safe")
+            anyhow::bail!(
+                "unsupported signature_type {value}; expected eoa, proxy, gnosis-safe, or poly-1271"
+            )
         }
     }
+}
+
+fn requires_funder(signature_type: SignatureType) -> bool {
+    matches!(
+        signature_type,
+        SignatureType::Proxy | SignatureType::GnosisSafe | SignatureType::Poly1271
+    )
 }
 
 pub(crate) fn private_key_env_candidates(account_name: &str) -> [String; 3] {
@@ -186,7 +218,37 @@ mod tests {
     fn parse_signature_type_rejects_unknown_values() {
         assert!(parse_signature_type("proxy").is_ok());
         assert!(parse_signature_type("gnosis-safe").is_ok());
+        assert!(parse_signature_type("poly-1271").is_ok());
         assert!(parse_signature_type("eoa").is_ok());
         assert!(parse_signature_type("gnosis").is_err());
+    }
+
+    #[test]
+    fn live_config_uses_account_funder_before_wallet() {
+        let env_key = "POLYFOLLOW_PRIVATE_KEY_FUNDER_TEST";
+        // SAFETY: Tests use a unique environment variable name and do not share it.
+        unsafe {
+            std::env::set_var(
+                env_key,
+                "0x0123456789012345678901234567890123456789012345678901234567890123",
+            )
+        };
+        let account = AccountConfig {
+            name: "funder_test".to_string(),
+            wallet: Some("0x1111111111111111111111111111111111111111".to_string()),
+            funder: Some("0x2222222222222222222222222222222222222222".to_string()),
+            signature_type: "poly-1271".to_string(),
+            ..Default::default()
+        };
+
+        let config = LiveExecutionConfig::from_env(&account, "https://clob.polymarket.com")
+            .expect("valid live config");
+
+        assert_eq!(
+            config.funder,
+            Some(Address::from_str("0x2222222222222222222222222222222222222222").unwrap())
+        );
+        // SAFETY: Cleanup for the unique test environment variable.
+        unsafe { std::env::remove_var(env_key) };
     }
 }

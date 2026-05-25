@@ -47,7 +47,7 @@ pub async fn run(cli: Cli) -> Result<()> {
             if matches!(mode, ExecutionMode::Live) {
                 for leader in cfg.leaders.iter().filter(|leader| leader.enabled) {
                     let account = cfg.account_for_leader(leader)?;
-                    LiveExecutionConfig::from_env(account)?;
+                    LiveExecutionConfig::from_env(account, &cfg.global.clob_base_url)?;
                 }
             }
             let mut storage = Storage::open(&db_path(db_override.as_ref(), &cfg))?;

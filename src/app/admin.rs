@@ -25,6 +25,9 @@ pub(super) fn handle_setup(
     if let Some(wallet) = args.wallet {
         cfg.account.wallet = Some(normalize_address(&wallet)?);
     }
+    if let Some(funder) = args.funder {
+        cfg.account.funder = Some(normalize_address(&funder)?);
+    }
     config::save(&config_path, &cfg)?;
     let db_path = db_path(db_override.as_ref(), &cfg);
     let mut storage = Storage::open(&db_path)?;

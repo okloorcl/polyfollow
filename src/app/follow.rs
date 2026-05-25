@@ -86,7 +86,8 @@ pub(super) async fn run_once(
                 notifier.notify_intent(&intent, Some(&result)).await;
             } else if intent.verdict == crate::types::IntentVerdict::Live {
                 let request = serde_json::to_value(&intent)?;
-                let live_config = LiveExecutionConfig::from_env(account)?;
+                let live_config =
+                    LiveExecutionConfig::from_env(account, &cfg.global.clob_base_url)?;
                 match execute_live_market_order(&live_config, &intent).await {
                     Ok(response) => {
                         let status = live_attempt_status(&response);

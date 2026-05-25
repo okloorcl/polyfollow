@@ -6,7 +6,7 @@ use serde::Serialize;
 
 use crate::cli::{Cli, RunMode};
 use crate::config::{self, AppConfig, ExecutionMode};
-use crate::execution::private_key_env_candidates;
+use crate::execution::{parse_signature_type, private_key_env_candidates};
 use crate::output::print_json;
 
 pub(super) fn config_path(cli: &Cli) -> Result<PathBuf> {
@@ -74,8 +74,22 @@ pub(super) fn doctor_warnings(cfg: &AppConfig) -> Vec<String> {
     for account in live_accounts(cfg) {
         if account.wallet.is_none() {
             warnings.push(format!(
-                "account {} wallet is not configured; live trading will not work",
+                "account {} wallet is not configured; profile/account diagnostics will be limited",
                 account.name
+            ));
+        }
+        let signature_type = parse_signature_type(&account.signature_type);
+        if signature_type.is_ok()
+            && account.signature_type != "eoa"
+            && account
+                .funder
+                .as_ref()
+                .or(account.wallet.as_ref())
+                .is_none()
+        {
+            warnings.push(format!(
+                "account {} funder is missing; set account.funder to your Polymarket deposit address for {} live trading",
+                account.name, account.signature_type
             ));
         }
         let env_keys = private_key_env_candidates(&account.name);

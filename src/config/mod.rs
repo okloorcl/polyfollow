@@ -58,6 +58,8 @@ pub struct AccountConfig {
     pub name: String,
     #[serde(default)]
     pub wallet: Option<String>,
+    #[serde(default)]
+    pub funder: Option<String>,
     #[serde(default = "default_max_capital")]
     pub max_capital_usdc: Decimal,
     #[serde(default = "default_account_max_daily_loss")]
@@ -171,6 +173,7 @@ impl Default for AccountConfig {
         Self {
             name: default_account_name(),
             wallet: None,
+            funder: None,
             max_capital_usdc: default_max_capital(),
             max_daily_loss_usdc: default_account_max_daily_loss(),
             signature_type: default_signature_type(),
