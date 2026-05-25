@@ -446,6 +446,7 @@ notify_blocked = false
 | Live 二次确认 | Live 必须显式 `--live --confirm-live` |
 | 环境变量私钥 | 私钥只从环境变量读取 |
 | Kill switch | `global.kill_switch = true` 会阻止新的复制执行 |
+| 全局上限 | `max_open_positions` 以及 global/account 中更严格的 daily-loss 上限会阻止新的买入 |
 | Leader 级上限 | 单笔、每日、持仓都有独立上限 |
 | 市场过滤 | 每个 leader 可以配置 allow/block |
 | 市场质量检查 | 有 order book 数据时检查 drift、spread、depth |

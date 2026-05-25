@@ -458,6 +458,7 @@ notify_blocked = false
 | Live confirmation | Live requires `--live --confirm-live` |
 | Environment keys | Private keys are read from env vars only |
 | Kill switch | `global.kill_switch = true` blocks new copy execution |
+| Global caps | `max_open_positions` and the stricter global/account daily-loss cap block new buys |
 | Per-leader caps | Max order, daily notional, and open position caps |
 | Market filters | Allow/block text filters per leader |
 | Market quality checks | Price drift, spread, and depth checks when order-book data exists |
