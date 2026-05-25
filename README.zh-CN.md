@@ -5,6 +5,8 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/okloorcl/polyfollow/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/okloorcl/polyfollow/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/okloorcl/polyfollow/actions/workflows/release.yml"><img alt="release" src="https://github.com/okloorcl/polyfollow/actions/workflows/release.yml/badge.svg"></a>
   <a href="https://github.com/okloorcl/polyfollow"><img alt="repo" src="https://img.shields.io/badge/repo-okloorcl%2Fpolyfollow-24292f"></a>
   <img alt="rust" src="https://img.shields.io/badge/Rust-2024-b7410e">
   <img alt="polymarket" src="https://img.shields.io/badge/Polymarket-CLOB-0f766e">
@@ -45,7 +47,32 @@ PolyFollow 用来跟踪一个或多个 Polymarket 领头钱包，把他们的新
 
 ## 安装
 
-PolyFollow 是 Rust 单二进制应用。本地构建：
+PolyFollow 设计成单二进制应用。普通用户优先从最新 GitHub Release 下载对应平台的二进制：
+
+```text
+https://github.com/okloorcl/polyfollow/releases/latest
+```
+
+Release 会自动构建这些平台：
+
+| 平台 | 架构 |
+| --- | --- |
+| Linux | `x86_64-unknown-linux-gnu`, `i686-unknown-linux-gnu`, `armv7-unknown-linux-gnueabihf`, `aarch64-unknown-linux-gnu` |
+| macOS | `x86_64-apple-darwin`, `aarch64-apple-darwin` |
+| Windows | `x86_64-pc-windows-msvc`, `i686-pc-windows-msvc` |
+
+Linux/macOS 示例：
+
+```bash
+tar -xzf polyfollow-v0.1.0-aarch64-apple-darwin.tar.gz
+cd polyfollow-v0.1.0-aarch64-apple-darwin
+chmod +x polyfollow
+./polyfollow --help
+```
+
+Windows 用户下载对应 `.zip`，解压后运行 `polyfollow.exe`。
+
+开发时再从源码构建：
 
 ```bash
 git clone https://github.com/okloorcl/polyfollow.git
@@ -541,6 +568,15 @@ cargo build --release
 ```
 
 Release profile 已启用 thin LTO、单 codegen unit、strip 和 `panic = "abort"`，用于生成更小的优化二进制。
+
+CI 会在 push 和 pull request 时执行 formatting、clippy、tests 和多 target build。GitHub Release 由版本 tag 触发：
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Release workflow 会上传 Linux/macOS 的 `.tar.gz`、Windows 的 `.zip`，并为每个 artifact 生成 `.sha256` 校验文件。
 
 ## 路线图
 

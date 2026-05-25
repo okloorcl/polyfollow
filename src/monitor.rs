@@ -44,11 +44,11 @@ impl ActivityPoller {
             .context("failed to decode Polymarket activities")?;
 
         let now = Utc::now();
-        Ok(activities
+        activities
             .into_iter()
             .filter(|activity| activity.activity_type.eq_ignore_ascii_case("TRADE"))
             .filter_map(|activity| normalize_activity(&leader.address, activity, now).transpose())
-            .collect::<Result<Vec<_>>>()?)
+            .collect::<Result<Vec<_>>>()
     }
 }
 

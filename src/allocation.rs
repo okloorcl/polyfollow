@@ -77,27 +77,29 @@ mod tests {
 
     #[test]
     fn equal_weight_allocation_uses_enabled_leaders() {
-        let mut cfg = AppConfig::default();
-        cfg.leaders = vec![
-            LeaderConfig {
-                address: "0x2222222222222222222222222222222222222222".to_string(),
-                label: None,
-                account_name: None,
-                enabled: true,
-                copy: CopyConfig::default(),
-                risk: LeaderRiskConfig::default(),
-                filters: Default::default(),
-            },
-            LeaderConfig {
-                address: "0x3333333333333333333333333333333333333333".to_string(),
-                label: None,
-                account_name: None,
-                enabled: false,
-                copy: CopyConfig::default(),
-                risk: LeaderRiskConfig::default(),
-                filters: Default::default(),
-            },
-        ];
+        let cfg = AppConfig {
+            leaders: vec![
+                LeaderConfig {
+                    address: "0x2222222222222222222222222222222222222222".to_string(),
+                    label: None,
+                    account_name: None,
+                    enabled: true,
+                    copy: CopyConfig::default(),
+                    risk: LeaderRiskConfig::default(),
+                    filters: Default::default(),
+                },
+                LeaderConfig {
+                    address: "0x3333333333333333333333333333333333333333".to_string(),
+                    label: None,
+                    account_name: None,
+                    enabled: false,
+                    copy: CopyConfig::default(),
+                    risk: LeaderRiskConfig::default(),
+                    filters: Default::default(),
+                },
+            ],
+            ..Default::default()
+        };
         let plan = build_allocation_plan(&cfg, dec!(1000), dec!(0.02), dec!(0.1)).unwrap();
         assert_eq!(plan.enabled_leaders, 1);
         assert_eq!(plan.rows[0].suggested_max_order_usdc, dec!(20.00));

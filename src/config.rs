@@ -10,7 +10,7 @@ use crate::validate::{normalize_address, validate_address};
 
 pub const DEFAULT_CONFIG_FILE: &str = "config.toml";
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AppConfig {
     #[serde(default)]
     pub global: GlobalConfig,
@@ -140,18 +140,6 @@ pub enum CopyMode {
     #[default]
     Ratio,
     Fixed,
-}
-
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self {
-            global: GlobalConfig::default(),
-            account: AccountConfig::default(),
-            accounts: Vec::new(),
-            notifications: NotificationConfig::default(),
-            leaders: Vec::new(),
-        }
-    }
 }
 
 impl Default for GlobalConfig {

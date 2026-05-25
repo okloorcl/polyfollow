@@ -69,6 +69,9 @@ leader sources
 - [x] Leader cooldown audit with optional config demotion.
 - [x] Portfolio-level allocation optimizer with optional config apply.
 - [x] MarketBridge agent context enrichment command.
+- [x] GitHub Actions CI for formatting, clippy, tests, and multi-target builds.
+- [x] Tag-driven GitHub Release workflow for multi-platform binaries and
+      checksums.
 
 ## References Studied
 

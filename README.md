@@ -5,6 +5,8 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/okloorcl/polyfollow/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/okloorcl/polyfollow/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/okloorcl/polyfollow/actions/workflows/release.yml"><img alt="release" src="https://github.com/okloorcl/polyfollow/actions/workflows/release.yml/badge.svg"></a>
   <a href="https://github.com/okloorcl/polyfollow"><img alt="repo" src="https://img.shields.io/badge/repo-okloorcl%2Fpolyfollow-24292f"></a>
   <img alt="rust" src="https://img.shields.io/badge/Rust-2024-b7410e">
   <img alt="polymarket" src="https://img.shields.io/badge/Polymarket-CLOB-0f766e">
@@ -50,7 +52,34 @@ audit engine.
 
 ## Install
 
-PolyFollow is a Rust single-binary application. Build it locally:
+PolyFollow is designed to be used as a single binary. For normal use, download
+the matching asset from the latest GitHub Release:
+
+```text
+https://github.com/okloorcl/polyfollow/releases/latest
+```
+
+Release assets are built for:
+
+| Platform | Assets |
+| --- | --- |
+| Linux | `x86_64-unknown-linux-gnu`, `i686-unknown-linux-gnu`, `armv7-unknown-linux-gnueabihf`, `aarch64-unknown-linux-gnu` |
+| macOS | `x86_64-apple-darwin`, `aarch64-apple-darwin` |
+| Windows | `x86_64-pc-windows-msvc`, `i686-pc-windows-msvc` |
+
+Linux/macOS example:
+
+```bash
+tar -xzf polyfollow-v0.1.0-aarch64-apple-darwin.tar.gz
+cd polyfollow-v0.1.0-aarch64-apple-darwin
+chmod +x polyfollow
+./polyfollow --help
+```
+
+Windows users can download the matching `.zip`, extract it, and run
+`polyfollow.exe`.
+
+Build from source when developing:
 
 ```bash
 git clone https://github.com/okloorcl/polyfollow.git
@@ -552,6 +581,17 @@ cargo build --release
 
 The release profile enables thin LTO, one codegen unit, symbol stripping, and
 `panic = "abort"` for smaller optimized binaries.
+
+CI runs formatting, clippy, tests, and multi-target builds on every push and
+pull request. GitHub Releases are created from version tags:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The release workflow uploads `.tar.gz` archives for Linux/macOS, `.zip`
+archives for Windows, and a `.sha256` checksum for every artifact.
 
 ## Roadmap
 

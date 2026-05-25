@@ -91,8 +91,7 @@ pub fn build_intent(
                                 + leader.risk.max_price_drift_bps / Decimal::from(10_000));
                         if best_ask > max_price {
                             reasons.push(format!(
-                                "best_ask {} exceeds drift-adjusted max {}",
-                                best_ask, max_price
+                                "best_ask {best_ask} exceeds drift-adjusted max {max_price}"
                             ));
                         }
                     }
@@ -104,8 +103,7 @@ pub fn build_intent(
                                 - leader.risk.max_price_drift_bps / Decimal::from(10_000));
                         if best_bid < min_price {
                             reasons.push(format!(
-                                "best_bid {} below drift-adjusted min {}",
-                                best_bid, min_price
+                                "best_bid {best_bid} below drift-adjusted min {min_price}"
                             ));
                         }
                     }
@@ -150,7 +148,7 @@ pub fn build_intent(
         intent_id: format!("intent:{}:{}", leader.address, trade.trade_id),
         leader_address: leader.address.clone(),
         trade_id: trade.trade_id.clone(),
-        mode: format!("{:?}", mode).to_ascii_lowercase(),
+        mode: format!("{mode:?}").to_ascii_lowercase(),
         side: trade.side,
         market_id: trade.condition_id.clone(),
         token_id: trade.token_id.clone(),
