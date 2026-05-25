@@ -54,19 +54,11 @@ fn import_polyalpha(
     let max_order = parse_decimal(&args.max_order, "max-order")?;
     let max_daily = parse_decimal(&args.max_daily, "max-daily")?;
     let candidates = load_candidates(&args.input, min_score, &args.verdict)?;
+    let (new_candidates, skipped_existing) = split_new_candidates(cfg, &candidates);
     let mut imported = Vec::new();
-    let mut skipped_existing = 0usize;
 
     if !args.dry_run {
-        for candidate in &candidates {
-            if cfg
-                .leaders
-                .iter()
-                .any(|leader| leader.address.eq_ignore_ascii_case(&candidate.address))
-            {
-                skipped_existing += 1;
-                continue;
-            }
+        for candidate in &new_candidates {
             let leader = leader_from_candidate(candidate, copy_ratio, max_order, max_daily);
             cfg.add_leader(leader)?;
             imported.push(candidate.clone());
@@ -89,6 +81,26 @@ fn import_polyalpha(
             println!("Skipped existing: {}", response.skipped_existing);
         }
     })
+}
+
+fn split_new_candidates(
+    cfg: &AppConfig,
+    candidates: &[PolyAlphaCandidate],
+) -> (Vec<PolyAlphaCandidate>, usize) {
+    let mut new_candidates = Vec::new();
+    let mut skipped_existing = 0usize;
+    for candidate in candidates {
+        if cfg
+            .leaders
+            .iter()
+            .any(|leader| leader.address.eq_ignore_ascii_case(&candidate.address))
+        {
+            skipped_existing += 1;
+        } else {
+            new_candidates.push(candidate.clone());
+        }
+    }
+    (new_candidates, skipped_existing)
 }
 
 fn leader_from_candidate(
@@ -211,4 +223,50 @@ fn print_leaders(json: bool, cfg: &AppConfig) -> Result<()> {
             );
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use rust_decimal_macros::dec;
+
+    use super::*;
+
+    #[test]
+    fn polyalpha_candidate_split_counts_existing_in_preview() {
+        let existing = "0x2222222222222222222222222222222222222222";
+        let fresh = "0x3333333333333333333333333333333333333333";
+        let cfg = AppConfig {
+            leaders: vec![LeaderConfig {
+                address: existing.to_string(),
+                label: None,
+                account_name: None,
+                enabled: true,
+                copy: CopyConfig::default(),
+                risk: LeaderRiskConfig::default(),
+                filters: Default::default(),
+            }],
+            ..Default::default()
+        };
+        let candidates = vec![
+            candidate(existing),
+            candidate(&existing.to_ascii_uppercase()),
+            candidate(fresh),
+        ];
+
+        let (new_candidates, skipped_existing) = split_new_candidates(&cfg, &candidates);
+
+        assert_eq!(skipped_existing, 2);
+        assert_eq!(new_candidates.len(), 1);
+        assert_eq!(new_candidates[0].address, fresh);
+    }
+
+    fn candidate(address: &str) -> PolyAlphaCandidate {
+        PolyAlphaCandidate {
+            address: address.to_string(),
+            label: "test".to_string(),
+            score: dec!(0.9),
+            verdict: "paper_only".to_string(),
+            source: "test".to_string(),
+        }
+    }
 }
