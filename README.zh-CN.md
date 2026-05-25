@@ -58,7 +58,7 @@ Release 会自动构建这些平台：
 | 平台 | 架构 |
 | --- | --- |
 | Linux | `x86_64-unknown-linux-gnu`, `i686-unknown-linux-gnu`, `armv7-unknown-linux-gnueabihf`, `aarch64-unknown-linux-gnu` |
-| macOS | `x86_64-apple-darwin`, `aarch64-apple-darwin` |
+| macOS | `aarch64-apple-darwin` |
 | Windows | `x86_64-pc-windows-msvc`, `i686-pc-windows-msvc` |
 
 Linux/macOS 示例：
