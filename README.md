@@ -1,44 +1,229 @@
 # PolyFollow
 
-Self-custody Polymarket copy-trading engine.
+<p align="center">
+  <strong>Self-custody, paper-first Polymarket copy-trading engine.</strong>
+</p>
 
-PolyFollow tracks one or more leader wallets, converts their new trades into
-copy intents, applies strict risk controls, and executes them in paper mode by
-default. Live trading is opt-in and requires explicit confirmation.
+<p align="center">
+  <a href="https://github.com/okloorcl/polyfollow"><img alt="repo" src="https://img.shields.io/badge/repo-okloorcl%2Fpolyfollow-24292f"></a>
+  <img alt="rust" src="https://img.shields.io/badge/Rust-2024-b7410e">
+  <img alt="polymarket" src="https://img.shields.io/badge/Polymarket-CLOB-0f766e">
+  <img alt="mode" src="https://img.shields.io/badge/default-paper%20trading-2563eb">
+  <img alt="storage" src="https://img.shields.io/badge/storage-SQLite-003b57">
+  <img alt="output" src="https://img.shields.io/badge/output-CLI%20%2B%20JSON%20%2B%20HTTP-111827">
+  <img alt="license" src="https://img.shields.io/badge/license-MIT-green">
+</p>
 
-## Current Status
+<p align="center">
+  <code>rust</code>
+  <code>polymarket</code>
+  <code>copy-trading</code>
+  <code>paper-trading</code>
+  <code>clob</code>
+  <code>sqlite</code>
+  <code>websocket</code>
+  <code>cli</code>
+  <code>json</code>
+  <code>self-custody</code>
+</p>
 
-This project is under active implementation. The safe paper-trading loop is
-usable now. Native live execution is wired through the official Polymarket Rust
-SDK, but it remains opt-in and guarded by explicit flags plus an environment
-private key.
+PolyFollow watches one or more Polymarket leader wallets, turns their new
+trades into copy intents, applies strict per-leader and account-level risk
+controls, and executes in paper mode by default. Live trading exists, but it is
+guarded by explicit flags, environment-only private keys, and risk checks.
 
-## Intended Usage
+It is intentionally separate from research tools such as PolyAlpha. PolyAlpha
+can help discover who may be worth following; PolyFollow is the execution and
+audit engine.
+
+## What You Can Do
+
+| Need | Command |
+| --- | --- |
+| Create local config and SQLite database | `polyfollow setup` |
+| Add smart-money wallets with per-wallet limits | `polyfollow leader add ...` |
+| Import PolyAlpha follow candidates | `polyfollow leader import-polyalpha ...` |
+| Run one safe paper cycle | `polyfollow run --paper --once` |
+| Run continuous paper following | `polyfollow run --paper` |
+| Opt in to live CLOB execution | `polyfollow run --live --confirm-live` |
+| Inspect orders, logs, PnL, and status | `orders`, `logs`, `pnl`, `status` |
+| Expose local read-only API | `polyfollow serve` |
+| Render a static dashboard | `polyfollow dashboard` |
+| Watch CLOB websocket events | `polyfollow watch-clob` |
+| Poll Polygon logs as backup | `polyfollow watch-chain` |
+| Replay normalized trades offline | `polyfollow backtest` |
+| Suggest portfolio-level caps | `polyfollow allocate` |
+| Disable noisy leaders after repeated risk blocks | `polyfollow cooldown` |
+| Fetch MarketBridge context for agents | `polyfollow marketbridge-context` |
+
+## Install
+
+PolyFollow is a Rust single-binary application. Build it locally:
+
+```bash
+git clone https://github.com/okloorcl/polyfollow.git
+cd polyfollow
+cargo build --release
+./target/release/polyfollow --help
+```
+
+During development you can run the binary through Cargo:
+
+```bash
+cargo run -- --help
+cargo run -- setup
+cargo run -- run --paper --once
+```
+
+The important Cargo syntax is the double dash. `cargo run -- run --paper` runs
+the `polyfollow run --paper` command. Do not write `cargo run polyfollow run`.
+
+## Quick Start
+
+Create a config and database:
+
+```bash
+polyfollow setup --wallet 0x1111111111111111111111111111111111111111
+polyfollow doctor
+polyfollow config path
+```
+
+Add a leader using ratio sizing:
+
+```bash
+polyfollow leader add 0x2222222222222222222222222222222222222222 \
+  --label "weather specialist" \
+  --copy-ratio 0.10 \
+  --max-order 20 \
+  --max-daily 100 \
+  --max-position 250
+```
+
+Add a fixed-size leader and ignore sells:
+
+```bash
+polyfollow leader add 0x3333333333333333333333333333333333333333 \
+  --label "small fixed" \
+  --fixed-order 10 \
+  --max-order 10 \
+  --max-daily 50 \
+  --no-sell
+```
+
+Run a single paper cycle:
+
+```bash
+polyfollow run --paper --once
+polyfollow orders
+polyfollow logs
+polyfollow pnl
+polyfollow status
+```
+
+Print machine-readable JSON for agents:
+
+```bash
+polyfollow --json leader list
+polyfollow --json run --paper --once --limit 50
+polyfollow --json orders --limit 50
+polyfollow --json pnl
+```
+
+## Live Trading
+
+Live mode is deliberately hard to trigger by accident. All of these are
+required:
+
+```bash
+export POLYFOLLOW_PRIVATE_KEY="0x..."
+polyfollow run --live --confirm-live
+```
+
+Account-specific keys are supported. If a leader is assigned to account
+`research`, PolyFollow checks `POLYFOLLOW_PRIVATE_KEY_RESEARCH` first, then
+falls back to `POLYFOLLOW_PRIVATE_KEY`, then `POLYMARKET_PRIVATE_KEY`.
+
+```toml
+[[accounts]]
+name = "research"
+wallet = "0x1111111111111111111111111111111111111111"
+signature_type = "proxy"
+```
+
+```bash
+export POLYFOLLOW_PRIVATE_KEY_RESEARCH="0x..."
+polyfollow leader update 0x2222222222222222222222222222222222222222 \
+  --account research
+polyfollow run --live --confirm-live --once
+```
+
+Private keys are read from the environment. They are not written to TOML or the
+SQLite audit database.
+
+## Command Reference
+
+### Global Options
+
+| Option | Meaning |
+| --- | --- |
+| `--config <path>` | Use a specific config file instead of `~/.config/polyfollow/config.toml` |
+| `--db <path>` | Override `global.db_path` for the SQLite database |
+| `--json` | Print machine-readable JSON instead of human text |
+
+### Setup And Config
 
 ```bash
 polyfollow setup
-polyfollow leader add 0xabc... \
-  --label "weather specialist" \
-  --account main \
-  --copy-ratio 0.10 \
-  --max-order 20 \
-  --max-daily 100
-
-polyfollow leader add 0xdef... \
-  --label "small fixed" \
-  --fixed-order 10 \
-  --no-sell
-
-polyfollow leader list
-polyfollow run --paper --once
-polyfollow status
-polyfollow pnl
+polyfollow setup --wallet 0x1111111111111111111111111111111111111111
+polyfollow setup --force
+polyfollow config show
+polyfollow config path
+polyfollow doctor
 ```
 
-Import leader candidates from PolyAlpha:
+`doctor` validates config shape, wallet addresses, database access, and live
+safety conditions.
+
+### Leader Management
 
 ```bash
-polyfollow leader import-polyalpha /path/to/polyalpha/data/oktrader.sqlite \
+polyfollow leader add <wallet> [options]
+polyfollow leader update <wallet> [options]
+polyfollow leader remove <wallet>
+polyfollow leader list
+```
+
+Common leader options:
+
+| Option | Meaning |
+| --- | --- |
+| `--label <text>` | Human label for the wallet |
+| `--account <name>` | Route this leader to a configured account |
+| `--copy-ratio <decimal>` | Copy leader notional by ratio, for example `0.10` |
+| `--fixed-order <usdc>` | Use a fixed USDC order size per buy |
+| `--max-order <usdc>` | Per-copy order cap |
+| `--max-daily <usdc>` | Per-leader daily notional cap |
+| `--max-position <usdc>` | Per-leader open position cap |
+| `--market-allow <text>` | Only allow matching market text, repeatable |
+| `--market-block <text>` | Block matching market text, repeatable |
+| `--no-buy` | Do not copy buys |
+| `--no-sell` | Do not copy sells |
+
+Update-only toggles:
+
+```bash
+polyfollow leader update <wallet> --enabled false
+polyfollow leader update <wallet> --support-buy false
+polyfollow leader update <wallet> --support-sell true
+```
+
+### PolyAlpha Import
+
+PolyFollow can import leader candidates from PolyAlpha JSON exports or from a
+SQLite database containing `wallet_follow_scores`.
+
+```bash
+polyfollow leader import-polyalpha /path/to/polyalpha.sqlite \
   --min-score 0.80 \
   --copy-ratio 0.05 \
   --max-order 15 \
@@ -46,95 +231,95 @@ polyfollow leader import-polyalpha /path/to/polyalpha/data/oktrader.sqlite \
   --dry-run
 ```
 
-Supported PolyAlpha inputs are JSON exports with wallet/account fields or a
-SQLite database containing `wallet_follow_scores`.
+Use `--dry-run` first. Remove it only after the candidate set looks right.
 
-Live trading will stay blocked unless invoked explicitly:
+### Follow Loop
 
 ```bash
-export POLYFOLLOW_PRIVATE_KEY="0x..."
+polyfollow run --paper --once
+polyfollow run --paper --limit 100
+polyfollow run --mode paper
 polyfollow run --live --confirm-live --once
 ```
 
-Paper mode polls the Polymarket Data API, normalizes leader trades,
-deduplicates them, enriches with CLOB order-book checks when token ids are
-available, builds copy intents, and records paper fills. Live mode submits
-market FAK orders to the Polymarket CLOB only after all risk checks pass.
+The loop does this for every enabled leader:
+
+1. Poll Polymarket activity.
+2. Normalize leader trades.
+3. Dedupe already processed events.
+4. Enrich with CLOB order-book checks when token ids are available.
+5. Apply sizing, market filters, latency, spread, depth, drift, daily, order,
+   and position limits.
+6. Record a copy intent.
+7. Execute through paper ledger or live CLOB adapter.
+8. Persist audit rows and optional notifications.
+
+### State And Reports
+
+```bash
+polyfollow status
+polyfollow orders --limit 50
+polyfollow logs --limit 50
+polyfollow pnl
+```
+
 Paper sells are matched against tracked paper buys using FIFO, so `pnl` can
 show realized PnL instead of only open notional.
 
-## Design
+### Local HTTP API
 
-```text
-src/app/          command orchestration and follow loop
-src/cli.rs        clap command definitions
-src/config.rs     TOML config model and validation
-src/engine.rs     sizing and risk decisions
-src/execution.rs  paper/live execution adapters
-src/market.rs     CLOB order-book enrichment
-src/monitor.rs    Polymarket Data API trade polling
-src/storage/      SQLite schema, audit rows, and paper ledger
-src/server.rs     local read-only HTTP API
-src/watch.rs      CLOB websocket watcher
-```
-
-See [PLAN.md](PLAN.md) for the implementation roadmap.
-
-## Configuration Model
-
-PolyFollow uses one TOML config file plus one SQLite database:
-
-- Config: global mode and risk, account wallet, per-leader sizing/risk.
-- SQLite: observed trades, dedupe state, copy intents, paper fills, live attempts.
-- Live key: `POLYFOLLOW_PRIVATE_KEY` or `POLYMARKET_PRIVATE_KEY`. Keys are read
-  from the environment and are not written to the config or SQLite database.
-
-Default paths:
-
-```bash
-polyfollow config path
-```
-
-Example leader controls:
-
-```bash
-polyfollow leader add 0x2222222222222222222222222222222222222222 \
-  --label smart1 \
-  --copy-ratio 0.2 \
-  --max-order 25 \
-  --max-daily 100 \
-  --no-sell
-```
-
-Human output is the default. Add `--json` for agents:
-
-```bash
-polyfollow --json leader list
-polyfollow --json run --paper --once --limit 50
-polyfollow --json orders
-polyfollow --json logs
-polyfollow --json status
-```
-
-## Local HTTP API
-
-The local API is read-only in this milestone, so dashboards and agents can read
-state without receiving an HTTP trading endpoint.
+Run a read-only local API for dashboards and agents:
 
 ```bash
 polyfollow serve --addr 127.0.0.1:8787
+```
+
+Endpoints:
+
+```bash
 curl http://127.0.0.1:8787/health
 curl http://127.0.0.1:8787/status
+curl http://127.0.0.1:8787/leaders
 curl 'http://127.0.0.1:8787/orders?limit=20'
 curl 'http://127.0.0.1:8787/logs?limit=20'
 curl http://127.0.0.1:8787/pnl
 ```
 
-Render a static dashboard without running a server:
+The server is read-only. It does not expose HTTP trading endpoints.
+
+### Static Dashboard
 
 ```bash
 polyfollow dashboard --out polyfollow-dashboard.html --limit 50
 ```
+
+This renders a local HTML snapshot from SQLite. It is useful for quick reviews
+without keeping a server running.
+
+### CLOB Websocket Watcher
+
+```bash
+polyfollow watch-clob --asset 123456789 --once
+polyfollow watch-clob --asset 123 --asset 456 --json
+polyfollow watch-clob --assets-file token_ids.txt --chunk-size 500
+```
+
+This subscribes to Polymarket market websocket events for token/asset ids.
+
+### On-Chain Backup Watcher
+
+```bash
+polyfollow --json watch-chain \
+  --rpc-url https://polygon-rpc.com \
+  --contract 0x0000000000000000000000000000000000000000 \
+  --from-block 72100000 \
+  --once
+```
+
+Use this as a raw backup feed from Polygon logs when you want an independent
+view of exchange activity.
+
+### Backtesting
 
 Replay normalized `LeaderTrade[]` JSON through the paper engine:
 
@@ -143,21 +328,35 @@ polyfollow --json backtest trades.json \
   --leader 0x2222222222222222222222222222222222222222
 ```
 
-Preview or apply portfolio-level leader caps:
+The leader must exist in config so the same sizing and risk rules are used.
+
+### Allocation Optimizer
+
+Preview or apply portfolio-level caps:
 
 ```bash
 polyfollow allocate --capital 1000 --order-fraction 0.02 --daily-fraction 0.10
 polyfollow allocate --capital 1000 --apply
 ```
 
-Audit or disable leaders that repeatedly fail risk checks:
+This helps spread account capital across enabled leaders and keeps per-leader
+risk budgets consistent.
+
+### Cooldown Audit
+
+Audit leaders that repeatedly fail risk checks:
 
 ```bash
 polyfollow cooldown --blocked-threshold 5
 polyfollow cooldown --blocked-threshold 5 --apply
 ```
 
-Fetch live context from a local MarketBridge instance:
+Without `--apply`, the command only suggests changes. With `--apply`, noisy
+leaders can be disabled in config.
+
+### MarketBridge Context
+
+Fetch market context from a local MarketBridge instance:
 
 ```bash
 polyfollow --json marketbridge-context \
@@ -167,63 +366,218 @@ polyfollow --json marketbridge-context \
   --market perp
 ```
 
-## CLOB Websocket Watcher
+This is for agent workflows that combine Polymarket copy signals with broader
+market context.
 
-Watch live order-book events for one or more Polymarket token ids:
+## Configuration
 
-```bash
-polyfollow watch-clob --asset 123456789 --once --json
-polyfollow watch-clob --assets-file token_ids.txt
-```
-
-## On-Chain Backup Watcher
-
-When you want a raw backup feed from Polygon itself, poll OrderFilled logs from
-the Polymarket exchange contract:
+Default config path:
 
 ```bash
-polyfollow --json watch-chain \
-  --rpc-url https://polygon-rpc.com \
-  --contract 0x... \
-  --from-block 72100000 \
-  --once
+polyfollow config path
 ```
 
-## Live Safety
-
-Live trading requires all of these:
-
-```bash
-export POLYFOLLOW_PRIVATE_KEY="0x..."
-polyfollow run --live --confirm-live
-```
-
-Optional account signature type in `config.toml`:
+Minimal shape:
 
 ```toml
+[global]
+mode = "paper"
+db_path = "/Users/you/.local/share/polyfollow/polyfollow.sqlite"
+data_api_base_url = "https://data-api.polymarket.com"
+clob_base_url = "https://clob.polymarket.com"
+poll_interval_secs = 10
+max_daily_loss_usdc = "100"
+max_open_positions = 50
+kill_switch = false
+
 [account]
-signature_type = "proxy" # proxy, eoa, or gnosis-safe
-
-[[accounts]]
-name = "research"
-wallet = "0x..."
+name = "main"
+wallet = "0x1111111111111111111111111111111111111111"
+max_capital_usdc = "1000"
+max_daily_loss_usdc = "50"
 signature_type = "proxy"
-```
 
-Leaders can be assigned to an account with `--account research`. Live mode looks
-for account-specific private keys first, for example
-`POLYFOLLOW_PRIVATE_KEY_RESEARCH`, then falls back to `POLYFOLLOW_PRIVATE_KEY`
-and `POLYMARKET_PRIVATE_KEY`.
+[[leaders]]
+address = "0x2222222222222222222222222222222222222222"
+label = "weather specialist"
+enabled = true
 
-## Notifications
+[leaders.copy]
+mode = "ratio"
+ratio = "0.10"
+fixed_order_usdc = "10"
 
-Notifications are optional and best-effort. A failed notification logs a warning
-but does not stop the follow loop.
+[leaders.risk]
+max_order_usdc = "20"
+max_daily_usdc = "100"
+max_position_usdc = "250"
+max_latency_secs = 120
+max_price_drift_bps = "100"
+max_spread_bps = "250"
+min_depth_usdc = "50"
+support_buy = true
+support_sell = true
 
-```toml
+[leaders.filters]
+allow = []
+block = []
+
 [notifications]
 webhook_url = "https://example.com/polyfollow"
 telegram_bot_token = "123456:bot-token"
 telegram_chat_id = "123456789"
 notify_blocked = false
 ```
+
+## Safety Model
+
+| Guard | Behavior |
+| --- | --- |
+| Paper default | `setup` and normal `run` behavior stay in paper mode unless changed |
+| Live confirmation | Live requires `--live --confirm-live` |
+| Environment keys | Private keys are read from env vars only |
+| Kill switch | `global.kill_switch = true` blocks new copy execution |
+| Per-leader caps | Max order, daily notional, and open position caps |
+| Market filters | Allow/block text filters per leader |
+| Market quality checks | Price drift, spread, and depth checks when order-book data exists |
+| FIFO sells | Paper sell PnL is matched against tracked paper buys |
+| Full audit | Observed trades, intents, fills, live attempts, and blocks go to SQLite |
+
+## Architecture
+
+```text
+Polymarket Data API
+Polymarket CLOB websocket
+Polygon RPC logs
+PolyAlpha exports
+MarketBridge context
+        |
+        v
+monitor + watchers + importers
+        |
+        v
+normalization + dedupe
+        |
+        v
+CLOB market enrichment
+        |
+        v
+sizing engine + risk engine
+        |
+        v
+copy intent
+        |
+        +--> paper executor -> FIFO ledger -> PnL
+        |
+        +--> live executor  -> Polymarket CLOB SDK
+        |
+        v
+SQLite audit database
+        |
+        +--> CLI text/JSON
+        +--> read-only HTTP API
+        +--> static dashboard
+        +--> webhook/Telegram notifications
+```
+
+## Project Layout
+
+```text
+src/main.rs        binary entrypoint
+src/cli.rs         Clap command definitions
+src/app/           command orchestration and follow loop
+src/config.rs      TOML config model and validation hooks
+src/engine.rs      sizing and risk decisions
+src/execution.rs   paper/live execution adapters
+src/market.rs      CLOB order-book enrichment
+src/monitor.rs     Polymarket Data API polling
+src/watch.rs       CLOB websocket watcher
+src/chain.rs       Polygon log polling
+src/storage/       SQLite schema, rows, paper ledger, and audit access
+src/server.rs      local read-only HTTP API
+src/dashboard.rs   static HTML dashboard rendering
+src/backtest.rs    offline replay engine
+src/allocation.rs  portfolio-level cap suggestions
+src/cooldown.rs    blocked-leader audit
+src/polyalpha.rs   PolyAlpha import support
+src/marketbridge.rs MarketBridge context fetcher
+```
+
+## Tech Stack
+
+| Layer | Technology |
+| --- | --- |
+| Language | Rust 2024 |
+| Async runtime | Tokio |
+| CLI | Clap derive |
+| Config | TOML, Serde |
+| Storage | SQLite via Rusqlite bundled |
+| HTTP client | Reqwest with Rustls |
+| HTTP server | Axum |
+| Websocket | tokio-tungstenite |
+| Money math | rust_decimal |
+| Polymarket execution | official `polymarket-client-sdk` with CLOB feature |
+| Hashing / chain helpers | tiny-keccak |
+| Agent output | stable JSON via `--json` |
+
+## Data Sources
+
+| Source | Used For |
+| --- | --- |
+| Polymarket Data API | Leader activity polling |
+| Polymarket CLOB REST/order book | Spread, depth, drift checks and live execution |
+| Polymarket CLOB websocket | Token/asset event watcher |
+| Polygon JSON-RPC logs | On-chain backup monitoring |
+| PolyAlpha JSON/SQLite | Candidate leader import |
+| MarketBridge HTTP | Optional market context enrichment |
+
+## Output Philosophy
+
+PolyFollow is built for both humans and agents:
+
+- Human commands default to readable text.
+- `--json` prints stable machine-readable responses.
+- The local HTTP API is read-only and agent-safe.
+- Every trade decision keeps enough context to audit later.
+- Live execution is never hidden behind an HTTP endpoint.
+
+## Development
+
+Run the verification suite:
+
+```bash
+cargo fmt --check
+cargo check
+cargo test
+```
+
+Build an optimized binary:
+
+```bash
+cargo build --release
+./target/release/polyfollow --help
+```
+
+The release profile enables thin LTO, one codegen unit, symbol stripping, and
+`panic = "abort"` for smaller optimized binaries.
+
+## Roadmap
+
+See [PLAN.md](PLAN.md). The current roadmap has completed:
+
+- P0: config, leaders, SQLite audit, polling, dedupe, sizing, risk, paper loop,
+  guarded live execution.
+- P1: CLOB websocket watcher, on-chain backup watcher, FIFO PnL, multi-account
+  keys, notifications, PolyAlpha import, local HTTP API.
+- P2: static dashboard, backtesting, cooldown audit, allocation optimizer,
+  MarketBridge context.
+
+Future work can focus on release automation, richer dashboards, more exchange
+telemetry, and deeper strategy evaluation.
+
+## Disclaimer
+
+PolyFollow is software for research and automation. Prediction markets are
+risky, liquidity can vanish, copied traders can be wrong, and live execution can
+lose money. Start in paper mode, use tiny caps, and understand every configured
+leader before enabling live trading.
