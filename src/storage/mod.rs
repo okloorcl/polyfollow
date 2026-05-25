@@ -268,6 +268,46 @@ impl Storage {
         })
     }
 
+    pub fn open_position_count(&self) -> Result<u32> {
+        let paper_count: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM paper_fills WHERE status = 'open'",
+            [],
+            |row| row.get(0),
+        )?;
+        let live_count: i64 = self.conn.query_row(
+            r#"
+            SELECT COUNT(*)
+            FROM (
+                SELECT COALESCE(i.market_id, i.token_id, i.intent_id) AS position_key,
+                       SUM(CASE i.side WHEN 'buy' THEN 1 WHEN 'sell' THEN -1 ELSE 0 END) AS net
+                FROM copy_intents i
+                JOIN live_order_attempts a ON a.intent_id = i.intent_id
+                WHERE i.verdict = 'live'
+                  AND a.status = 'submitted'
+                GROUP BY position_key
+                HAVING net > 0
+            )
+            "#,
+            [],
+            |row| row.get(0),
+        )?;
+        Ok((paper_count.max(0) + live_count.max(0)) as u32)
+    }
+
+    pub fn daily_realized_pnl_at(&self, at: DateTime<Utc>) -> Result<Decimal> {
+        let value: Option<String> = self.conn.query_row(
+            r#"
+            SELECT CAST(COALESCE(SUM(CAST(pnl_usdc AS REAL)), 0) AS TEXT)
+            FROM paper_fills
+            WHERE status != 'open'
+              AND date(exit_at) = date(?1)
+            "#,
+            params![at.to_rfc3339()],
+            |row| row.get(0),
+        )?;
+        Ok(parse_decimal_or_zero(value))
+    }
+
     pub fn leader_daily_notional(&self, leader_address: &str) -> Result<Decimal> {
         self.leader_daily_notional_at(leader_address, Utc::now())
     }

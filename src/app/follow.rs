@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use chrono::Utc;
 
 use crate::config::{AppConfig, ExecutionMode};
 use crate::engine::{RiskContext, build_intent};
@@ -25,6 +26,7 @@ pub(super) async fn run_once(
     let notifier = Notifier::new(&cfg.notifications);
     let mut stats = RunStats::default();
     for leader in cfg.leaders.iter().filter(|leader| leader.enabled) {
+        let account = cfg.account_for_leader(leader)?;
         let trades = poller
             .fetch_trades(leader, limit)
             .await
@@ -47,6 +49,13 @@ pub(super) async fn run_once(
                 } else {
                     None
                 },
+                open_positions: Some(storage.open_position_count()?),
+                max_open_positions: Some(cfg.global.max_open_positions),
+                realized_pnl_today_usdc: Some(storage.daily_realized_pnl_at(Utc::now())?),
+                max_daily_loss_usdc: Some(min_decimal(
+                    cfg.global.max_daily_loss_usdc,
+                    account.max_daily_loss_usdc,
+                )),
                 book: None,
                 book_error: None,
             };
@@ -76,7 +85,6 @@ pub(super) async fn run_once(
                 notifier.notify_intent(&intent, Some(&result)).await;
             } else if intent.verdict == crate::types::IntentVerdict::Live {
                 let request = serde_json::to_value(&intent)?;
-                let account = cfg.account_for_leader(leader)?;
                 let live_config = LiveExecutionConfig::from_env(account)?;
                 match execute_live_market_order(&live_config, &intent).await {
                     Ok(response) => {
@@ -105,6 +113,10 @@ pub(super) async fn run_once(
         }
     }
     Ok(stats)
+}
+
+fn min_decimal(left: rust_decimal::Decimal, right: rust_decimal::Decimal) -> rust_decimal::Decimal {
+    if left <= right { left } else { right }
 }
 
 pub(super) async fn run_loop(

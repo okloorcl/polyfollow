@@ -34,7 +34,7 @@ pub fn run_backtest(cfg: &AppConfig, leader: &str, input: &Path) -> Result<Backt
         chrono::Utc::now().timestamp_nanos_opt().unwrap()
     ));
     let mut storage = Storage::open(&temp)?;
-    let mut report = replay(leader, &trades, &mut storage)?;
+    let mut report = replay(cfg, leader, &trades, &mut storage)?;
     let pnl = storage.pnl_summary()?;
     report.open_notional_usdc = pnl.open_notional_usdc;
     report.realized_pnl_usdc = pnl.realized_pnl_usdc;
@@ -53,6 +53,7 @@ fn load_trades(path: &Path, leader_address: &str) -> Result<Vec<LeaderTrade>> {
 }
 
 fn replay(
+    cfg: &AppConfig,
     leader: &LeaderConfig,
     trades: &[LeaderTrade],
     storage: &mut Storage,
@@ -81,6 +82,13 @@ fn replay(
             } else {
                 None
             },
+            open_positions: Some(storage.open_position_count()?),
+            max_open_positions: Some(cfg.global.max_open_positions),
+            realized_pnl_today_usdc: Some(storage.daily_realized_pnl_at(trade.source_timestamp)?),
+            max_daily_loss_usdc: Some(min_decimal(
+                cfg.global.max_daily_loss_usdc,
+                cfg.account_for_leader(leader)?.max_daily_loss_usdc,
+            )),
             book: None,
             book_error: None,
         };
@@ -96,6 +104,10 @@ fn replay(
         }
     }
     Ok(report)
+}
+
+fn min_decimal(left: Decimal, right: Decimal) -> Decimal {
+    if left <= right { left } else { right }
 }
 
 #[cfg(test)]

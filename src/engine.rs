@@ -10,6 +10,10 @@ pub struct RiskContext {
     pub leader_daily_notional_usdc: Decimal,
     pub market_open_notional_usdc: Decimal,
     pub available_position_shares: Option<Decimal>,
+    pub open_positions: Option<u32>,
+    pub max_open_positions: Option<u32>,
+    pub realized_pnl_today_usdc: Option<Decimal>,
+    pub max_daily_loss_usdc: Option<Decimal>,
     pub book: Option<BookMetrics>,
     pub book_error: Option<&'static str>,
 }
@@ -36,6 +40,27 @@ pub fn build_intent(
             trade.latency_ms,
             leader.risk.max_latency_secs * 1000
         ));
+    }
+    if trade.side == TradeSide::Buy
+        && let (Some(open_positions), Some(max_open_positions)) =
+            (risk_context.open_positions, risk_context.max_open_positions)
+        && open_positions >= max_open_positions
+    {
+        reasons.push(format!(
+            "open_positions {open_positions} reached max_open_positions {max_open_positions}"
+        ));
+    }
+    if let (Some(realized_pnl), Some(max_daily_loss)) = (
+        risk_context.realized_pnl_today_usdc,
+        risk_context.max_daily_loss_usdc,
+    ) && realized_pnl < Decimal::ZERO
+    {
+        let realized_loss = -realized_pnl;
+        if realized_loss >= max_daily_loss {
+            reasons.push(format!(
+                "daily realized loss {realized_loss} reached max_daily_loss_usdc {max_daily_loss}"
+            ));
+        }
     }
 
     let calculated_notional = match leader.copy.mode {
@@ -294,5 +319,60 @@ mod tests {
         assert_eq!(intent.notional_usdc, dec!(10.0));
         assert_eq!(intent.shares, Some(dec!(20)));
         assert_eq!(intent.verdict, IntentVerdict::Paper);
+    }
+
+    #[test]
+    fn buy_intent_blocks_when_global_position_cap_is_reached() {
+        let leader = LeaderConfig {
+            address: "0x2222222222222222222222222222222222222222".to_string(),
+            label: None,
+            account_name: None,
+            enabled: true,
+            copy: CopyConfig {
+                mode: CopyMode::Ratio,
+                ratio: dec!(1),
+                fixed_order_usdc: dec!(10),
+            },
+            risk: LeaderRiskConfig::default(),
+            filters: Default::default(),
+        };
+        let trade = LeaderTrade {
+            leader_address: leader.address.clone(),
+            trade_id: "tx-cap".to_string(),
+            source: "test".to_string(),
+            source_timestamp: Utc::now(),
+            received_at: Utc::now(),
+            latency_ms: 100,
+            side: TradeSide::Buy,
+            condition_id: Some("market-1".to_string()),
+            token_id: Some("123".to_string()),
+            title: None,
+            slug: None,
+            event_slug: None,
+            outcome: None,
+            outcome_index: None,
+            price: Some(dec!(0.5)),
+            shares: Some(dec!(20)),
+            notional_usdc: dec!(10),
+            raw_json: serde_json::json!({}),
+        };
+        let intent = build_intent(
+            ExecutionMode::Paper,
+            &leader,
+            &trade,
+            RiskContext {
+                open_positions: Some(30),
+                max_open_positions: Some(30),
+                ..RiskContext::default()
+            },
+        );
+
+        assert_eq!(intent.verdict, IntentVerdict::Blocked);
+        assert!(
+            intent
+                .reasons
+                .iter()
+                .any(|reason| reason.contains("max_open_positions"))
+        );
     }
 }
