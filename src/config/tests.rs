@@ -33,3 +33,13 @@ fn validate_rejects_zero_account_capital() {
 
     assert!(cfg.validate().is_err());
 }
+
+#[test]
+fn validate_rejects_unknown_signature_type() {
+    let mut cfg = AppConfig::default();
+    cfg.account.signature_type = "gnosis".to_string();
+
+    let err = cfg.validate().unwrap_err();
+
+    assert!(err.to_string().contains("signature_type"));
+}

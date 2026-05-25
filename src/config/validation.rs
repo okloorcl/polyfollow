@@ -106,6 +106,8 @@ fn validate_account(account: &AccountConfig, label: &str) -> Result<()> {
     if account.max_capital_usdc <= Decimal::ZERO {
         anyhow::bail!("{label}.max_capital_usdc must be positive");
     }
+    crate::execution::parse_signature_type(&account.signature_type)
+        .with_context(|| format!("{label}.signature_type is invalid"))?;
     ensure_decimal_non_negative(
         account.max_daily_loss_usdc,
         &format!("{label}.max_daily_loss_usdc must be non-negative"),

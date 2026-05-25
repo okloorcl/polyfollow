@@ -43,10 +43,10 @@ impl LiveExecutionConfig {
                 format!(
                     "set {account_key}, POLYFOLLOW_PRIVATE_KEY, or POLYMARKET_PRIVATE_KEY for live mode"
                 )
-            })?;
+        })?;
         Ok(Self {
             private_key,
-            signature_type: parse_signature_type(&account.signature_type),
+            signature_type: parse_signature_type(&account.signature_type)?,
         })
     }
 }
@@ -114,11 +114,14 @@ fn live_order_response_json(response: &PostOrderResponse) -> serde_json::Value {
     })
 }
 
-fn parse_signature_type(value: &str) -> SignatureType {
+pub(crate) fn parse_signature_type(value: &str) -> Result<SignatureType> {
     match value {
-        "proxy" => SignatureType::Proxy,
-        "gnosis-safe" => SignatureType::GnosisSafe,
-        _ => SignatureType::Eoa,
+        "eoa" => Ok(SignatureType::Eoa),
+        "proxy" => Ok(SignatureType::Proxy),
+        "gnosis-safe" => Ok(SignatureType::GnosisSafe),
+        _ => {
+            anyhow::bail!("unsupported signature_type {value}; expected eoa, proxy, or gnosis-safe")
+        }
     }
 }
 
@@ -168,5 +171,13 @@ mod tests {
             "0x0000000000000000000000000000000000000000000000000000000000000123"
         );
         assert_eq!(payload["trade_ids"][0], "trade-1");
+    }
+
+    #[test]
+    fn parse_signature_type_rejects_unknown_values() {
+        assert!(parse_signature_type("proxy").is_ok());
+        assert!(parse_signature_type("gnosis-safe").is_ok());
+        assert!(parse_signature_type("eoa").is_ok());
+        assert!(parse_signature_type("gnosis").is_err());
     }
 }
