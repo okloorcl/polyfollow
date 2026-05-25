@@ -61,7 +61,13 @@ fn validate_args(args: &WatchClobArgs) -> Result<()> {
 }
 
 fn load_assets(args: &WatchClobArgs) -> Result<Vec<String>> {
-    let mut assets = args.assets.clone();
+    let mut assets = args
+        .assets
+        .iter()
+        .map(|asset| asset.trim())
+        .filter(|asset| !asset.is_empty())
+        .map(ToOwned::to_owned)
+        .collect::<Vec<_>>();
     if let Some(path) = args.assets_file.as_ref() {
         let text = std::fs::read_to_string(path)
             .with_context(|| format!("failed to read {}", path.display()))?;
@@ -147,5 +153,20 @@ mod tests {
         args.chunk_size = 0;
 
         assert!(validate_args(&args).is_err());
+    }
+
+    #[test]
+    fn load_assets_trims_and_deduplicates_cli_assets() {
+        let mut args = base_args();
+        args.assets = vec![
+            " 123 ".to_string(),
+            "123".to_string(),
+            "".to_string(),
+            "456".to_string(),
+        ];
+
+        let assets = load_assets(&args).unwrap();
+
+        assert_eq!(assets, vec!["123".to_string(), "456".to_string()]);
     }
 }
