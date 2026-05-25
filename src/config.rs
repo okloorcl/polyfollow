@@ -197,12 +197,26 @@ impl Default for LeaderRiskConfig {
 
 impl AppConfig {
     pub fn validate(&self) -> Result<()> {
+        ensure_positive(
+            self.global.poll_interval_secs,
+            "global.poll_interval_secs must be positive",
+        )?;
+        ensure_decimal_non_negative(
+            self.global.max_daily_loss_usdc,
+            "global.max_daily_loss_usdc must be non-negative",
+        )?;
+        ensure_positive(
+            self.global.max_open_positions,
+            "global.max_open_positions must be positive",
+        )?;
+        validate_account(&self.account, "account")?;
         if let Some(wallet) = &self.account.wallet {
             validate_address(wallet).context("account.wallet is not a valid address")?;
         }
         let mut account_names = std::collections::HashSet::new();
         account_names.insert(self.account.name.clone());
         for account in &self.accounts {
+            validate_account(account, &format!("account {}", account.name))?;
             if !account_names.insert(account.name.clone()) {
                 anyhow::bail!("duplicate account name: {}", account.name);
             }
@@ -234,6 +248,39 @@ impl AppConfig {
             }
             if leader.risk.max_order_usdc <= Decimal::ZERO {
                 anyhow::bail!("leader {} max_order_usdc must be positive", leader.address);
+            }
+            if leader.risk.max_daily_usdc <= Decimal::ZERO {
+                anyhow::bail!("leader {} max_daily_usdc must be positive", leader.address);
+            }
+            if leader.risk.max_position_usdc <= Decimal::ZERO {
+                anyhow::bail!(
+                    "leader {} max_position_usdc must be positive",
+                    leader.address
+                );
+            }
+            if leader.risk.max_latency_secs < 0 {
+                anyhow::bail!(
+                    "leader {} max_latency_secs must be non-negative",
+                    leader.address
+                );
+            }
+            if leader.risk.max_price_drift_bps < Decimal::ZERO {
+                anyhow::bail!(
+                    "leader {} max_price_drift_bps must be non-negative",
+                    leader.address
+                );
+            }
+            if leader.risk.max_spread_bps < Decimal::ZERO {
+                anyhow::bail!(
+                    "leader {} max_spread_bps must be non-negative",
+                    leader.address
+                );
+            }
+            if leader.risk.min_depth_usdc < Decimal::ZERO {
+                anyhow::bail!(
+                    "leader {} min_depth_usdc must be non-negative",
+                    leader.address
+                );
             }
         }
         Ok(())
@@ -282,6 +329,33 @@ impl AppConfig {
             .find(|account| account.name == account_name)
             .ok_or_else(|| anyhow::anyhow!("unknown account_name: {account_name}"))
     }
+}
+
+fn validate_account(account: &AccountConfig, label: &str) -> Result<()> {
+    if account.max_capital_usdc <= Decimal::ZERO {
+        anyhow::bail!("{label}.max_capital_usdc must be positive");
+    }
+    ensure_decimal_non_negative(
+        account.max_daily_loss_usdc,
+        &format!("{label}.max_daily_loss_usdc must be non-negative"),
+    )
+}
+
+fn ensure_decimal_non_negative(value: Decimal, message: &str) -> Result<()> {
+    if value < Decimal::ZERO {
+        anyhow::bail!("{message}");
+    }
+    Ok(())
+}
+
+fn ensure_positive<T>(value: T, message: &str) -> Result<()>
+where
+    T: PartialOrd + From<u8>,
+{
+    if value <= T::from(0) {
+        anyhow::bail!("{message}");
+    }
+    Ok(())
 }
 
 pub fn default_config_path() -> Result<PathBuf> {
@@ -418,4 +492,42 @@ fn default_spread_bps() -> Decimal {
 
 fn default_min_depth() -> Decimal {
     dec!(100)
+}
+
+#[cfg(test)]
+mod tests {
+    use rust_decimal_macros::dec;
+
+    use super::*;
+
+    fn valid_leader() -> LeaderConfig {
+        LeaderConfig {
+            address: "0x2222222222222222222222222222222222222222".to_string(),
+            label: None,
+            account_name: None,
+            enabled: true,
+            copy: CopyConfig::default(),
+            risk: LeaderRiskConfig::default(),
+            filters: Default::default(),
+        }
+    }
+
+    #[test]
+    fn validate_rejects_negative_leader_risk_caps() {
+        let mut cfg = AppConfig {
+            leaders: vec![valid_leader()],
+            ..Default::default()
+        };
+        cfg.leaders[0].risk.max_daily_usdc = dec!(-1);
+
+        assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_zero_account_capital() {
+        let mut cfg = AppConfig::default();
+        cfg.account.max_capital_usdc = Decimal::ZERO;
+
+        assert!(cfg.validate().is_err());
+    }
 }
