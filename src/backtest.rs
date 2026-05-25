@@ -68,7 +68,8 @@ fn replay(
     };
     for trade in trades {
         let context = RiskContext {
-            leader_daily_notional_usdc: storage.leader_daily_notional(&leader.address)?,
+            leader_daily_notional_usdc: storage
+                .leader_daily_notional_at(&leader.address, trade.source_timestamp)?,
             market_open_notional_usdc: storage
                 .leader_market_open_notional(&leader.address, trade.condition_id.as_deref())?,
             available_position_shares: if trade.side == TradeSide::Sell {
@@ -83,7 +84,8 @@ fn replay(
             book: None,
             book_error: None,
         };
-        let intent = build_intent(ExecutionMode::Paper, leader, trade, context);
+        let mut intent = build_intent(ExecutionMode::Paper, leader, trade, context);
+        intent.created_at = trade.source_timestamp;
         storage.insert_copy_intent(&intent)?;
         report.intents += 1;
         if intent.verdict == crate::types::IntentVerdict::Paper {
@@ -139,13 +141,69 @@ mod tests {
         let _ = std::fs::remove_file(path);
     }
 
+    #[test]
+    fn backtest_applies_daily_caps_by_trade_day() {
+        let leader = "0x2222222222222222222222222222222222222222";
+        let path = std::env::temp_dir().join(format!(
+            "polyfollow-backtest-days-{}.json",
+            chrono::Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        let day_one = Utc::now() - chrono::Duration::days(2);
+        let day_two = Utc::now() - chrono::Duration::days(1);
+        std::fs::write(
+            &path,
+            serde_json::to_string(&vec![
+                trade_at(leader, "day-1", TradeSide::Buy, day_one),
+                trade_at(leader, "day-2", TradeSide::Buy, day_two),
+            ])
+            .unwrap(),
+        )
+        .unwrap();
+        let cfg = AppConfig {
+            leaders: vec![LeaderConfig {
+                address: leader.to_string(),
+                label: None,
+                account_name: None,
+                enabled: true,
+                copy: CopyConfig {
+                    mode: CopyMode::Ratio,
+                    ratio: dec!(1),
+                    fixed_order_usdc: dec!(10),
+                },
+                risk: LeaderRiskConfig {
+                    max_daily_usdc: dec!(15),
+                    ..LeaderRiskConfig::default()
+                },
+                filters: Default::default(),
+            }],
+            ..AppConfig::default()
+        };
+
+        let report = run_backtest(&cfg, leader, &path).unwrap();
+
+        assert_eq!(report.trades, 2);
+        assert_eq!(report.fills, 2);
+        assert_eq!(report.blocked, 0);
+
+        let _ = std::fs::remove_file(path);
+    }
+
     fn trade(leader: &str, id: &str, side: TradeSide) -> LeaderTrade {
+        trade_at(leader, id, side, Utc::now())
+    }
+
+    fn trade_at(
+        leader: &str,
+        id: &str,
+        side: TradeSide,
+        source_timestamp: chrono::DateTime<Utc>,
+    ) -> LeaderTrade {
         LeaderTrade {
             leader_address: leader.to_string(),
             trade_id: id.to_string(),
             source: "test".to_string(),
-            source_timestamp: Utc::now(),
-            received_at: Utc::now(),
+            source_timestamp,
+            received_at: source_timestamp,
             latency_ms: 10,
             side,
             condition_id: Some("market".to_string()),

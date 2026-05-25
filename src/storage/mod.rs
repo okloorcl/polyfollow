@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use anyhow::{Context, Result};
+use chrono::{DateTime, Utc};
 use rusqlite::{Connection, params};
 use rust_decimal::Decimal;
 use serde::Serialize;
@@ -268,15 +269,23 @@ impl Storage {
     }
 
     pub fn leader_daily_notional(&self, leader_address: &str) -> Result<Decimal> {
+        self.leader_daily_notional_at(leader_address, Utc::now())
+    }
+
+    pub fn leader_daily_notional_at(
+        &self,
+        leader_address: &str,
+        at: DateTime<Utc>,
+    ) -> Result<Decimal> {
         let value: Option<String> = self.conn.query_row(
             r#"
             SELECT CAST(COALESCE(SUM(CAST(notional_usdc AS REAL)), 0) AS TEXT)
             FROM copy_intents
             WHERE leader_address = ?1
               AND verdict IN ('paper', 'live')
-              AND date(created_at) = date('now')
+              AND date(created_at) = date(?2)
             "#,
-            params![leader_address],
+            params![leader_address, at.to_rfc3339()],
             |row| row.get(0),
         )?;
         Ok(parse_decimal_or_zero(value))
