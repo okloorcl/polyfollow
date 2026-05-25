@@ -88,12 +88,16 @@ pub(super) async fn run_once(
                 let live_config = LiveExecutionConfig::from_env(account)?;
                 match execute_live_market_order(&live_config, &intent).await {
                     Ok(response) => {
+                        let status = live_attempt_status(&response);
                         storage.insert_live_attempt(
                             &intent.intent_id,
-                            "submitted",
+                            status,
                             &request,
                             Some(&response),
                         )?;
+                        if status != "submitted" {
+                            anyhow::bail!("{}", live_rejection_message(&response));
+                        }
                         notifier.notify_intent(&intent, None).await;
                     }
                     Err(error) => {
@@ -119,6 +123,26 @@ fn min_decimal(left: rust_decimal::Decimal, right: rust_decimal::Decimal) -> rus
     if left <= right { left } else { right }
 }
 
+fn live_attempt_status(response: &serde_json::Value) -> &'static str {
+    match response.get("success").and_then(serde_json::Value::as_bool) {
+        Some(true) => "submitted",
+        Some(false) => "rejected",
+        None => "unknown",
+    }
+}
+
+fn live_rejection_message(response: &serde_json::Value) -> String {
+    let exchange_status = response
+        .get("status")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("unknown");
+    let error_msg = response
+        .get("error_msg")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("no exchange error message");
+    format!("live order was not submitted: status={exchange_status}, error={error_msg}")
+}
+
 pub(super) async fn run_loop(
     cfg: &AppConfig,
     storage: &mut Storage,
@@ -135,5 +159,37 @@ pub(super) async fn run_loop(
             cfg.global.poll_interval_secs,
         ))
         .await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn live_attempt_status_distinguishes_exchange_rejections() {
+        assert_eq!(
+            live_attempt_status(&serde_json::json!({"success": true})),
+            "submitted"
+        );
+        assert_eq!(
+            live_attempt_status(&serde_json::json!({"success": false})),
+            "rejected"
+        );
+        assert_eq!(
+            live_attempt_status(&serde_json::json!({"status": "MATCHED"})),
+            "unknown"
+        );
+    }
+
+    #[test]
+    fn live_rejection_message_includes_exchange_reason() {
+        let message = live_rejection_message(&serde_json::json!({
+            "status": "UNMATCHED",
+            "error_msg": "insufficient balance"
+        }));
+
+        assert!(message.contains("UNMATCHED"));
+        assert!(message.contains("insufficient balance"));
     }
 }
