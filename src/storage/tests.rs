@@ -61,6 +61,54 @@ fn paper_sell_closes_fifo_and_records_realized_pnl() {
     let _ = std::fs::remove_file(path);
 }
 
+#[test]
+fn daily_notional_counts_accepted_live_and_paper_intents() {
+    let path = std::env::temp_dir().join(format!(
+        "polyfollow-daily-{}.sqlite",
+        chrono::Utc::now().timestamp_nanos_opt().unwrap()
+    ));
+    let storage = Storage::open(&path).unwrap();
+    let leader = "0x2222222222222222222222222222222222222222";
+    let token_id = "123";
+
+    let paper = intent(
+        "paper-1",
+        leader,
+        token_id,
+        TradeSide::Buy,
+        dec!(0.5),
+        dec!(25),
+    );
+    let mut live = intent(
+        "live-1",
+        leader,
+        token_id,
+        TradeSide::Buy,
+        dec!(0.5),
+        dec!(30),
+    );
+    live.mode = "live".to_string();
+    live.verdict = IntentVerdict::Live;
+    let mut blocked = intent(
+        "blocked-1",
+        leader,
+        token_id,
+        TradeSide::Buy,
+        dec!(0.5),
+        dec!(40),
+    );
+    blocked.verdict = IntentVerdict::Blocked;
+    blocked.reasons = vec!["risk block".to_string()];
+
+    storage.insert_copy_intent(&paper).unwrap();
+    storage.insert_copy_intent(&live).unwrap();
+    storage.insert_copy_intent(&blocked).unwrap();
+
+    assert_eq!(storage.leader_daily_notional(leader).unwrap(), dec!(55));
+
+    let _ = std::fs::remove_file(path);
+}
+
 fn intent(
     trade_id: &str,
     leader: &str,

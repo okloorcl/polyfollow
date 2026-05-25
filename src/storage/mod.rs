@@ -270,11 +270,11 @@ impl Storage {
     pub fn leader_daily_notional(&self, leader_address: &str) -> Result<Decimal> {
         let value: Option<String> = self.conn.query_row(
             r#"
-            SELECT CAST(COALESCE(SUM(CAST(p.notional_usdc AS REAL)), 0) AS TEXT)
-            FROM paper_fills p
-            JOIN copy_intents i ON i.intent_id = p.intent_id
-            WHERE i.leader_address = ?1
-              AND date(p.opened_at) = date('now')
+            SELECT CAST(COALESCE(SUM(CAST(notional_usdc AS REAL)), 0) AS TEXT)
+            FROM copy_intents
+            WHERE leader_address = ?1
+              AND verdict IN ('paper', 'live')
+              AND date(created_at) = date('now')
             "#,
             params![leader_address],
             |row| row.get(0),
