@@ -35,15 +35,16 @@ pub struct LiveExecutionConfig {
 
 impl LiveExecutionConfig {
     pub fn from_env(account: &AccountConfig) -> Result<Self> {
-        let account_key = account_private_key_env(&account.name);
-        let private_key = std::env::var(&account_key)
+        let env_keys = private_key_env_candidates(&account.name);
+        let private_key = std::env::var(&env_keys[0])
             .or_else(|_| std::env::var("POLYFOLLOW_PRIVATE_KEY"))
             .or_else(|_| std::env::var("POLYMARKET_PRIVATE_KEY"))
             .with_context(|| {
                 format!(
-                    "set {account_key}, POLYFOLLOW_PRIVATE_KEY, or POLYMARKET_PRIVATE_KEY for live mode"
+                    "set {}, POLYFOLLOW_PRIVATE_KEY, or POLYMARKET_PRIVATE_KEY for live mode",
+                    env_keys[0]
                 )
-        })?;
+            })?;
         Ok(Self {
             private_key,
             signature_type: parse_signature_type(&account.signature_type)?,
@@ -123,6 +124,14 @@ pub(crate) fn parse_signature_type(value: &str) -> Result<SignatureType> {
             anyhow::bail!("unsupported signature_type {value}; expected eoa, proxy, or gnosis-safe")
         }
     }
+}
+
+pub(crate) fn private_key_env_candidates(account_name: &str) -> [String; 3] {
+    [
+        account_private_key_env(account_name),
+        "POLYFOLLOW_PRIVATE_KEY".to_string(),
+        "POLYMARKET_PRIVATE_KEY".to_string(),
+    ]
 }
 
 fn account_private_key_env(account_name: &str) -> String {
