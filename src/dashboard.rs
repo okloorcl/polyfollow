@@ -40,7 +40,7 @@ pub fn render_dashboard(
 <body>
   <header>
     <h1>PolyFollow Dashboard</h1>
-    <p>Mode: {mode} · leaders: {leaders} · database: {db}</p>
+    <p>Mode: {mode} &middot; leaders: {leaders} &middot; database: {db}</p>
   </header>
   <main>
     <section>
@@ -137,4 +137,32 @@ fn html_escape(value: &str) -> String {
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dashboard_header_uses_valid_separator_entity() {
+        let db_path = std::env::temp_dir().join(format!(
+            "polyfollow-dashboard-{}.sqlite",
+            chrono::Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        let out = std::env::temp_dir().join(format!(
+            "polyfollow-dashboard-{}.html",
+            chrono::Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        let cfg = AppConfig::default();
+        let storage = Storage::open(&db_path).unwrap();
+
+        render_dashboard(&cfg, &storage, &out, 10).unwrap();
+        let html = std::fs::read_to_string(&out).unwrap();
+
+        assert!(html.contains("&middot; leaders:"));
+        assert!(!html.contains("Â"));
+
+        let _ = std::fs::remove_file(out);
+        let _ = std::fs::remove_file(db_path);
+    }
 }
