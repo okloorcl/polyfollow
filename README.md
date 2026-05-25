@@ -113,6 +113,22 @@ polyfollow doctor
 polyfollow config path
 ```
 
+### Which Address Goes Where?
+
+Polymarket shows more than one address. PolyFollow treats them as different
+roles:
+
+| Field | Use this address | Used for |
+| --- | --- | --- |
+| `account.wallet` / `--wallet` | Public profile/proxy wallet, the address in `polymarket.com/profile/...` | Reading your public account identity, diagnostics, and backward-compatible fallback |
+| `account.funder` / `--funder` | Deposit/recharge address shown in Polymarket's transfer dialog | Live CLOB orders for current deposit-wallet accounts |
+| private key env var | The private key for the wallet that signs Polymarket CLOB orders | Live authentication only |
+
+For current Polymarket deposit-wallet accounts, set
+`signature_type = "poly-1271"` and provide a `funder`. Do not put a private key
+in `config.toml`, README examples, shell history, or SQLite. PolyFollow only
+reads private keys from environment variables such as `POLYFOLLOW_PRIVATE_KEY`.
+
 Add a leader using ratio sizing:
 
 ```bash

@@ -104,6 +104,20 @@ polyfollow doctor
 polyfollow config path
 ```
 
+### 到底填哪个地址？
+
+Polymarket 会展示不止一个地址。PolyFollow 里它们不是同一个概念：
+
+| 字段 | 应该填什么 | 用来做什么 |
+| --- | --- | --- |
+| `account.wallet` / `--wallet` | 公开 profile/proxy 地址，也就是 `polymarket.com/profile/...` 里的地址 | 识别你的公开账户、诊断、兼容旧配置回退 |
+| `account.funder` / `--funder` | Polymarket 充值/转账弹窗里的 deposit address | 当前 deposit-wallet 账户真实 CLOB 下单时使用 |
+| 私钥环境变量 | 能给 Polymarket CLOB 订单签名的钱包私钥 | 只用于 Live 认证和下单 |
+
+当前 Polymarket deposit-wallet 账户通常使用 `signature_type = "poly-1271"`，
+并且需要填写 `funder`。不要把私钥写进 `config.toml`、README、命令历史或
+SQLite。PolyFollow 只从环境变量读取私钥，例如 `POLYFOLLOW_PRIVATE_KEY`。
+
 添加一个按比例跟单的 leader：
 
 ```bash
