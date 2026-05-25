@@ -3,7 +3,7 @@ use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
 use super::*;
-use crate::types::TradeSide;
+use crate::types::{CopyIntent, TradeSide};
 
 #[test]
 fn paper_sell_closes_fifo_and_records_realized_pnl() {
