@@ -112,13 +112,8 @@ pub(super) async fn run_loop(
     mode: ExecutionMode,
     limit: usize,
 ) -> Result<RunStats> {
-    let mut total = RunStats::default();
     loop {
         let stats = run_once(cfg, storage, mode, limit).await?;
-        total.fetched_trades += stats.fetched_trades;
-        total.new_trades += stats.new_trades;
-        total.blocked_intents += stats.blocked_intents;
-        total.paper_fills += stats.paper_fills;
         println!(
             "cycle: fetched={}, new={}, paper={}, blocked={}",
             stats.fetched_trades, stats.new_trades, stats.paper_fills, stats.blocked_intents

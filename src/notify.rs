@@ -115,11 +115,11 @@ fn telegram_text(intent: &CopyIntent, paper_result: Option<&PaperExecutionResult
     if !intent.reasons.is_empty() {
         lines.push(format!("reasons: {}", intent.reasons.join("; ")));
     }
-    if let Some(result) = paper_result {
-        if result.closed_lots > 0 {
-            lines.push(format!("closed lots: {}", result.closed_lots));
-            lines.push(format!("realized pnl: {} USDC", result.realized_pnl_usdc));
-        }
+    if let Some(result) = paper_result
+        && result.closed_lots > 0
+    {
+        lines.push(format!("closed lots: {}", result.closed_lots));
+        lines.push(format!("realized pnl: {} USDC", result.realized_pnl_usdc));
     }
     lines.join("\n")
 }
