@@ -5,6 +5,7 @@ use anyhow::{Context, Result};
 use polymarket_client_sdk::POLYGON;
 use polymarket_client_sdk::auth::{LocalSigner, Signer as _};
 use polymarket_client_sdk::clob;
+use polymarket_client_sdk::clob::types::response::PostOrderResponse;
 use polymarket_client_sdk::clob::types::{Amount, OrderType, Side, SignatureType};
 use polymarket_client_sdk::types::{Decimal as SdkDecimal, U256};
 
@@ -93,9 +94,24 @@ pub async fn execute_live_market_order(
         .await?;
     let order = client.sign(&signer, order).await?;
     let response = client.post_order(order).await?;
-    Ok(serde_json::json!({
-        "debug": format!("{response:?}")
-    }))
+    Ok(live_order_response_json(&response))
+}
+
+fn live_order_response_json(response: &PostOrderResponse) -> serde_json::Value {
+    serde_json::json!({
+        "order_id": &response.order_id,
+        "success": response.success,
+        "status": response.status.to_string(),
+        "error_msg": &response.error_msg,
+        "making_amount": response.making_amount.to_string(),
+        "taking_amount": response.taking_amount.to_string(),
+        "transaction_hashes": response
+            .transaction_hashes
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        "trade_ids": &response.trade_ids,
+    })
 }
 
 fn parse_signature_type(value: &str) -> SignatureType {
@@ -118,4 +134,39 @@ fn account_private_key_env(account_name: &str) -> String {
         })
         .collect::<String>();
     format!("POLYFOLLOW_PRIVATE_KEY_{suffix}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn live_order_response_json_preserves_audit_fields() {
+        let response: PostOrderResponse = serde_json::from_value(serde_json::json!({
+            "errorMsg": null,
+            "makingAmount": "12.5",
+            "takingAmount": "8.25",
+            "orderID": "0xorder",
+            "status": "MATCHED",
+            "success": true,
+            "transactionsHashes": [
+                "0x0000000000000000000000000000000000000000000000000000000000000123"
+            ],
+            "tradeIds": ["trade-1"]
+        }))
+        .expect("valid post-order response");
+
+        let payload = live_order_response_json(&response);
+
+        assert_eq!(payload["order_id"], "0xorder");
+        assert_eq!(payload["success"], true);
+        assert_eq!(payload["status"], "MATCHED");
+        assert_eq!(payload["making_amount"], "12.5");
+        assert_eq!(payload["taking_amount"], "8.25");
+        assert_eq!(
+            payload["transaction_hashes"][0],
+            "0x0000000000000000000000000000000000000000000000000000000000000123"
+        );
+        assert_eq!(payload["trade_ids"][0], "trade-1");
+    }
 }
