@@ -35,7 +35,7 @@ leader sources
 - [x] Project scaffold and product plan.
 - [x] TOML configuration with global, account, and per-leader controls.
 - [x] CLI commands: `setup`, `leader add/list/remove/update`, `run`, `status`,
-      `orders`, `pnl`, `logs`, `doctor`, `config show`.
+      `orders`, `live-attempts`, `pnl`, `logs`, `doctor`, `config show`.
 - [x] SQLite storage for leaders, processed trades, intents, paper fills, live
       order attempts, and risk state.
 - [x] Polymarket Data API activity polling for multiple leaders.
@@ -49,7 +49,9 @@ leader sources
 - [x] Paper executor and PnL/status reports.
 - [x] Native live Polymarket CLOB market-order executor using the official Rust
       SDK, environment private key, and explicit `--live --confirm-live`.
-- [x] README with simple “download and run” style usage.
+- [x] Structured live exchange response audit with order id, status, success,
+      trade ids, and transaction hashes.
+- [x] README with simple "download and run" style usage.
 
 ## P1 Scope
 
@@ -58,6 +60,8 @@ leader sources
 - [x] On-chain raw log backup monitor for Polymarket exchange contracts.
 - [x] FIFO sell matching for paper positions and realized PnL.
 - [x] Multi-account leader allocation with per-account live key env lookup.
+- [x] Live readiness diagnostics for wallets, env keys, enabled leaders, and
+      kill-switch state.
 - [x] Webhook/Telegram notifications for copy intents.
 - [x] Import leader scores from PolyAlpha JSON exports or SQLite.
 - [x] Local read-only HTTP API for status, leaders, orders, logs, and PnL.

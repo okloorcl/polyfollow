@@ -148,6 +148,7 @@ polyfollow status
 polyfollow --json leader list
 polyfollow --json run --paper --once --limit 50
 polyfollow --json orders --limit 50
+polyfollow --json live-attempts --limit 20
 polyfollow --json pnl
 ```
 
@@ -169,6 +170,9 @@ wallet = "0x1111111111111111111111111111111111111111"
 signature_type = "proxy"
 ```
 
+`signature_type` 会严格校验，只允许 `proxy`、`gnosis-safe` 或 `eoa`。
+未知值会直接报错，不会静默回退到其他签名模式。
+
 ```bash
 export POLYFOLLOW_PRIVATE_KEY_RESEARCH="0x..."
 polyfollow leader update 0x2222222222222222222222222222222222222222 \
@@ -177,6 +181,24 @@ polyfollow run --live --confirm-live --once
 ```
 
 私钥只从环境变量读取，不写入 TOML 配置，也不会写入 SQLite 审计数据库。
+
+Live 前先运行：
+
+```bash
+polyfollow doctor
+```
+
+`doctor` 会报告缺失的钱包、私钥环境变量、没有启用的 leader、kill switch
+状态，但不会打印私钥内容。Live 后可以查看交易所响应：
+
+```bash
+polyfollow live-attempts --limit 20
+polyfollow --json live-attempts --limit 20
+```
+
+成功响应会包含 exchange order id、exchange status、success flag、trade ids
+以及 Polymarket 返回的 transaction hashes。交易所返回 `success=false` 时会
+记录为 `rejected`，不会记为 `submitted`，因此不会污染 live open exposure。
 
 ## 命令说明
 
@@ -274,6 +296,7 @@ polyfollow run --live --confirm-live --once
 ```bash
 polyfollow status
 polyfollow orders --limit 50
+polyfollow live-attempts --limit 20
 polyfollow logs --limit 50
 polyfollow pnl
 ```
@@ -494,16 +517,16 @@ SQLite audit database
 
 ```text
 src/main.rs         二进制入口
-src/cli.rs          Clap 命令定义
-src/app/            命令编排和跟单循环
-src/config.rs       TOML 配置模型和校验
-src/engine.rs       sizing 和 risk 决策
+src/cli/            Clap 命令模块
+src/app/            命令编排、报表和跟单循环
+src/config/         TOML 配置、默认值、存储和校验
+src/engine/         sizing 和 risk 决策模块
 src/execution.rs    paper/live 执行适配器
 src/market.rs       CLOB order book 补充
 src/monitor.rs      Polymarket Data API 轮询
 src/watch.rs        CLOB websocket watcher
 src/chain.rs        Polygon log polling
-src/storage/        SQLite schema、rows、paper ledger、audit access
+src/storage/        SQLite schema、rows、paper ledger、risk、audit access
 src/server.rs       本地只读 HTTP API
 src/dashboard.rs    静态 HTML dashboard
 src/backtest.rs     离线回放引擎

@@ -40,7 +40,7 @@ audit engine.
 | Run one safe paper cycle | `polyfollow run --paper --once` |
 | Run continuous paper following | `polyfollow run --paper` |
 | Opt in to live CLOB execution | `polyfollow run --live --confirm-live` |
-| Inspect orders, logs, PnL, and status | `orders`, `logs`, `pnl`, `status` |
+| Inspect orders, live attempts, logs, PnL, and status | `orders`, `live-attempts`, `logs`, `pnl`, `status` |
 | Expose local read-only API | `polyfollow serve` |
 | Render a static dashboard | `polyfollow dashboard` |
 | Watch CLOB websocket events | `polyfollow watch-clob` |
@@ -147,6 +147,7 @@ Print machine-readable JSON for agents:
 polyfollow --json leader list
 polyfollow --json run --paper --once --limit 50
 polyfollow --json orders --limit 50
+polyfollow --json live-attempts --limit 20
 polyfollow --json pnl
 ```
 
@@ -171,6 +172,10 @@ wallet = "0x1111111111111111111111111111111111111111"
 signature_type = "proxy"
 ```
 
+`signature_type` is validated strictly. Use `proxy`, `gnosis-safe`, or `eoa`;
+unknown values are rejected instead of silently falling back to another signing
+mode.
+
 ```bash
 export POLYFOLLOW_PRIVATE_KEY_RESEARCH="0x..."
 polyfollow leader update 0x2222222222222222222222222222222222222222 \
@@ -180,6 +185,26 @@ polyfollow run --live --confirm-live --once
 
 Private keys are read from the environment. They are not written to TOML or the
 SQLite audit database.
+
+Before live mode, run:
+
+```bash
+polyfollow doctor
+```
+
+`doctor` reports missing live wallets, missing private-key environment
+variables, disabled leaders, and kill-switch state without printing secrets.
+After a live run, inspect exchange responses with:
+
+```bash
+polyfollow live-attempts --limit 20
+polyfollow --json live-attempts --limit 20
+```
+
+Successful live responses include the exchange order id, exchange status,
+success flag, trade ids, and transaction hashes when Polymarket returns them.
+Rejected exchange responses are recorded as `rejected`, not `submitted`, so
+they do not inflate open live exposure.
 
 ## Command Reference
 
@@ -280,6 +305,7 @@ The loop does this for every enabled leader:
 ```bash
 polyfollow status
 polyfollow orders --limit 50
+polyfollow live-attempts --limit 20
 polyfollow logs --limit 50
 polyfollow pnl
 ```
@@ -505,23 +531,23 @@ SQLite audit database
 ## Project Layout
 
 ```text
-src/main.rs        binary entrypoint
-src/cli.rs         Clap command definitions
-src/app/           command orchestration and follow loop
-src/config.rs      TOML config model and validation hooks
-src/engine.rs      sizing and risk decisions
-src/execution.rs   paper/live execution adapters
-src/market.rs      CLOB order-book enrichment
-src/monitor.rs     Polymarket Data API polling
-src/watch.rs       CLOB websocket watcher
-src/chain.rs       Polygon log polling
-src/storage/       SQLite schema, rows, paper ledger, and audit access
-src/server.rs      local read-only HTTP API
-src/dashboard.rs   static HTML dashboard rendering
-src/backtest.rs    offline replay engine
-src/allocation.rs  portfolio-level cap suggestions
-src/cooldown.rs    blocked-leader audit
-src/polyalpha.rs   PolyAlpha import support
+src/main.rs         binary entrypoint
+src/cli/            focused Clap command modules
+src/app/            command orchestration, reports, and follow loop
+src/config/         TOML config model, defaults, storage, and validation
+src/engine/         sizing and risk decision modules
+src/execution.rs    paper/live execution adapters
+src/market.rs       CLOB order-book enrichment
+src/monitor.rs      Polymarket Data API polling
+src/watch.rs        CLOB websocket watcher
+src/chain.rs        Polygon log polling
+src/storage/        SQLite schema, rows, paper ledger, risk, and audit access
+src/server.rs       local read-only HTTP API
+src/dashboard.rs    static HTML dashboard rendering
+src/backtest.rs     offline replay engine
+src/allocation.rs   portfolio-level cap suggestions
+src/cooldown.rs     blocked-leader audit
+src/polyalpha.rs    PolyAlpha import support
 src/marketbridge.rs MarketBridge context fetcher
 ```
 
