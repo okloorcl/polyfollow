@@ -375,4 +375,59 @@ mod tests {
                 .any(|reason| reason.contains("max_open_positions"))
         );
     }
+
+    #[test]
+    fn buy_intent_blocks_when_daily_loss_cap_is_reached() {
+        let leader = LeaderConfig {
+            address: "0x2222222222222222222222222222222222222222".to_string(),
+            label: None,
+            account_name: None,
+            enabled: true,
+            copy: CopyConfig {
+                mode: CopyMode::Ratio,
+                ratio: dec!(1),
+                fixed_order_usdc: dec!(10),
+            },
+            risk: LeaderRiskConfig::default(),
+            filters: Default::default(),
+        };
+        let trade = LeaderTrade {
+            leader_address: leader.address.clone(),
+            trade_id: "tx-loss".to_string(),
+            source: "test".to_string(),
+            source_timestamp: Utc::now(),
+            received_at: Utc::now(),
+            latency_ms: 100,
+            side: TradeSide::Buy,
+            condition_id: Some("market-1".to_string()),
+            token_id: Some("123".to_string()),
+            title: None,
+            slug: None,
+            event_slug: None,
+            outcome: None,
+            outcome_index: None,
+            price: Some(dec!(0.5)),
+            shares: Some(dec!(20)),
+            notional_usdc: dec!(10),
+            raw_json: serde_json::json!({}),
+        };
+        let intent = build_intent(
+            ExecutionMode::Paper,
+            &leader,
+            &trade,
+            RiskContext {
+                realized_pnl_today_usdc: Some(dec!(-50)),
+                max_daily_loss_usdc: Some(dec!(50)),
+                ..RiskContext::default()
+            },
+        );
+
+        assert_eq!(intent.verdict, IntentVerdict::Blocked);
+        assert!(
+            intent
+                .reasons
+                .iter()
+                .any(|reason| reason.contains("max_daily_loss_usdc"))
+        );
+    }
 }
