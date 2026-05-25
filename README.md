@@ -15,16 +15,8 @@
 </p>
 
 <p align="center">
-  <code>rust</code>
-  <code>polymarket</code>
-  <code>copy-trading</code>
-  <code>paper-trading</code>
-  <code>clob</code>
-  <code>sqlite</code>
-  <code>websocket</code>
-  <code>cli</code>
-  <code>json</code>
-  <code>self-custody</code>
+  <a href="README.md">English</a> |
+  <a href="README.zh-CN.md">简体中文</a>
 </p>
 
 PolyFollow watches one or more Polymarket leader wallets, turns their new
