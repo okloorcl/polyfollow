@@ -100,12 +100,7 @@ impl EvmRpc {
 }
 
 pub async fn watch_chain(args: WatchChainArgs, json_output: bool) -> Result<()> {
-    if args.contracts.is_empty() {
-        bail!("provide at least one --contract");
-    }
-    if args.batch_blocks == 0 {
-        bail!("--batch-blocks must be greater than zero");
-    }
+    validate_args(&args)?;
     let topics = if args.topics.is_empty() {
         order_filled_topics()
     } else {
@@ -125,6 +120,19 @@ pub async fn watch_chain(args: WatchChainArgs, json_output: bool) -> Result<()> 
             break;
         }
         tokio::time::sleep(std::time::Duration::from_secs(args.poll_secs)).await;
+    }
+    Ok(())
+}
+
+fn validate_args(args: &WatchChainArgs) -> Result<()> {
+    if args.contracts.is_empty() {
+        bail!("provide at least one --contract");
+    }
+    if args.batch_blocks == 0 {
+        bail!("--batch-blocks must be greater than zero");
+    }
+    if args.poll_secs == 0 {
+        bail!("--poll-secs must be greater than zero");
     }
     Ok(())
 }
@@ -205,5 +213,26 @@ mod tests {
             event_topic(ORDER_FILLED_SIG),
             event_topic(ORDER_FILLED_V2_SIG)
         );
+    }
+
+    #[test]
+    fn watch_chain_rejects_zero_intervals() {
+        let mut args = WatchChainArgs {
+            rpc_url: "https://example.invalid".to_string(),
+            contracts: vec!["0x2222222222222222222222222222222222222222".to_string()],
+            topics: Vec::new(),
+            from_block: Some(1),
+            batch_blocks: 1000,
+            poll_secs: 5,
+            once: true,
+        };
+        args.batch_blocks = 0;
+
+        assert!(validate_args(&args).is_err());
+
+        args.batch_blocks = 1000;
+        args.poll_secs = 0;
+
+        assert!(validate_args(&args).is_err());
     }
 }

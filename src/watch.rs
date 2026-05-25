@@ -6,9 +6,7 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 use crate::cli::WatchClobArgs;
 
 pub async fn watch_clob(args: WatchClobArgs, json_output: bool) -> Result<()> {
-    if args.chunk_size == 0 {
-        bail!("--chunk-size must be greater than zero");
-    }
+    validate_args(&args)?;
     let assets = load_assets(&args)?;
     if assets.is_empty() {
         bail!("provide at least one --asset or --assets-file");
@@ -48,6 +46,16 @@ pub async fn watch_clob(args: WatchClobArgs, json_output: bool) -> Result<()> {
                 }
             }
         }
+    }
+    Ok(())
+}
+
+fn validate_args(args: &WatchClobArgs) -> Result<()> {
+    if args.chunk_size == 0 {
+        bail!("--chunk-size must be greater than zero");
+    }
+    if args.ping_secs == 0 {
+        bail!("--ping-secs must be greater than zero");
     }
     Ok(())
 }
@@ -111,4 +119,33 @@ fn print_human_event(value: &Value) {
         .and_then(Value::as_str)
         .unwrap_or("-");
     println!("{event_type} asset={asset}");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn base_args() -> WatchClobArgs {
+        WatchClobArgs {
+            ws_url: "wss://example.invalid/ws".to_string(),
+            assets: vec!["123".to_string()],
+            assets_file: None,
+            chunk_size: 500,
+            ping_secs: 10,
+            once: true,
+        }
+    }
+
+    #[test]
+    fn watch_clob_rejects_zero_intervals() {
+        let mut args = base_args();
+        args.ping_secs = 0;
+
+        assert!(validate_args(&args).is_err());
+
+        let mut args = base_args();
+        args.chunk_size = 0;
+
+        assert!(validate_args(&args).is_err());
+    }
 }
